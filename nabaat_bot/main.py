@@ -30,19 +30,25 @@ logging.basicConfig(
         logging.StreamHandler(),  # Stream handler to display logs in the console
     ],
 )
-logger = logging.getLogger("agriWeather-bot")
+logger = logging.getLogger("nabaat-bot")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # Constants for ConversationHandler states
 TOKEN = os.environ["AGRIWEATHBOT_TOKEN"]
 ADMIN_LIST = [103465015, 31583686, 391763080, 216033407, 5827206050]
-MENU_CMDS = ['✍️ ثبت نام', '📤 دعوت از دیگران', '🖼 مشاهده باغ ها', '➕ اضافه کردن باغ', '🗑 حذف باغ ها', '✏️ ویرایش باغ ها', '🌦 درخواست اطلاعات هواشناسی', '/start', '/stats', '/send', '/set']
+GROUP_IDS = [-1001893146969]
+###################################################################
+###################################################################
+async def create_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    res = await context.bot.create_forum_topic(chat_id=GROUP_IDS[0], name=str(update.effective_user.id))
+    await context.bot.send_message(chat_id=ADMIN_LIST[0], text=res)
+    await context.bot.send_message(chat_id=ADMIN_LIST[0], text=dir(res))
+    # await context.bot.send_message(chat_id=GROUP_IDS[0], text="test message to threadID:81", message_thread_id=81)
 
-###################################################################
-###################################################################
 async def group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # if update.message.chat.type=='group':
+    await context.bot.send_message(chat_id=103465015, text=f"update: {update}")
     await context.bot.forward_message(chat_id=103465015, from_chat_id=update.message.chat_id, message_id=update.message.message_id)
 
 # Fallback handlers
@@ -79,7 +85,8 @@ def main():
     application = ApplicationBuilder().token(TOKEN).proxy_url(proxy_url).get_updates_proxy_url(proxy_url).build()
     # Add handlers to the application
     application.add_error_handler(error_handler)
-    application.add_handler(MessageHandler(filters.ALL, group_handler))
+    application.add_handler(CommandHandler('start', create_topic))
+    # application.add_handler(MessageHandler(filters.ALL, group_handler))
 
     
     # Start the bot
