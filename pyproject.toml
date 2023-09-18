@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "nabaat-bot"
+version = "0.1.0"
+description = ""
+authors = ["Amirr95 <arrezvaniyan@gmail.com>"]
+readme = "README.md"
+packages = [{include = "nabaat_bot"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+python-telegram-bot = {extras = ["job-queue"], version = "^20.5"}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
