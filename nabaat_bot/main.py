@@ -18,6 +18,9 @@ import html
 import json
 import traceback
 
+from utils.commands import start
+from utils.register_conv import register_conv_handler
+from utils.ask_question import ask_conv_handler
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -81,11 +84,13 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main():
     proxy_url = 'http://127.0.0.1:8889'
-    # application = ApplicationBuilder().token(TOKEN).build()
-    application = ApplicationBuilder().token(TOKEN).proxy_url(proxy_url).get_updates_proxy_url(proxy_url).build()
+    application = ApplicationBuilder().token(TOKEN).build()
+    # application = ApplicationBuilder().token(TOKEN).proxy_url(proxy_url).get_updates_proxy_url(proxy_url).build()
     # Add handlers to the application
     application.add_error_handler(error_handler)
-    application.add_handler(CommandHandler('start', create_topic))
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(ask_conv_handler)
+    application.add_handler(register_conv_handler)
     # application.add_handler(MessageHandler(filters.ALL, group_handler))
 
     
