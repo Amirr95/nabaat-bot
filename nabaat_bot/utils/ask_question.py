@@ -30,7 +30,7 @@ PREDEFINED_QUESTIONS = [
     'question 2',
     'question 3',
     'pictures?',
-    'additional info? else: پایان'
+    'additional-info'
 ]
 (
     Q2,
@@ -44,8 +44,9 @@ PREDEFINED_QUESTIONS = [
 async def q1(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     db.log_activity(user.id, "started to ask a question")
+    logger.info(f"{user.id} started a question")
     if not db.check_if_user_is_registered(user_id=user.id):
-        db.log_activity(user.id, "error - add farm", "not registered yet")
+        db.log_activity(user.id, "error - start question", "not registered yet")
         await update.message.reply_text(
             "لطفا پیش از ارسال سوال، از طریق /start ثبت نام کنید",
             reply_markup=register_keyboard(),
@@ -73,6 +74,7 @@ async def q2(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply_text, reply_markup=back_button())
         return Q2
     answer1 = update.message.text
+    db.log_activity(user.id, "answer received to q1", answer1)
     user_data['answer1'] = answer1
     db.add_new_question(user.id, PREDEFINED_QUESTIONS[0], answer1)
     reply_text = PREDEFINED_QUESTIONS[1]
@@ -92,16 +94,16 @@ async def q3(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("عمیلات قبلی لغو شد. لطفا دوباره تلاش کنید.", reply_markup=start_keyboard())
         return ConversationHandler.END
     if not update.message.text:
-        db.log_activity(user.id, "error - no answer received to q1")
+        db.log_activity(user.id, "error - no answer received to q2")
         reply_text = PREDEFINED_QUESTIONS[1]
         await update.message.reply_text(reply_text, reply_markup=back_button())
         return Q3
     answer2 = update.message.text
-    db.wip_questions_collection.update_one({"_id": user.id}, {"$set": {PREDEFINED_QUESTIONS[1]: answer2}})
+    db.wip_questions.update_one({"_id": user.id}, {"$set": {PREDEFINED_QUESTIONS[1]: answer2}})
     user_data['answer2'] = answer2
+    db.log_activity(user.id, "answer received to q2", answer2)
     # index = db.current_question_index(user.id)
     # db.set_user_attribute(user.id, f"questions.{index}.{PREDEFINED_QUESTIONS[1]}", answer2)
-    logger.info(answer2)
     reply_text = PREDEFINED_QUESTIONS[2]
     await update.message.reply_text(reply_text, reply_markup=back_button())
     return GET_PICTURES
@@ -124,11 +126,11 @@ async def get_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply_text, reply_markup=back_button())
         return Q3
     answer3 = update.message.text
-    db.wip_questions_collection.update_one({"_id": user.id}, {"$set": {PREDEFINED_QUESTIONS[2]: answer3}})
+    db.wip_questions.update_one({"_id": user.id}, {"$set": {PREDEFINED_QUESTIONS[2]: answer3}})
     user_data['answer3'] = answer3
+    db.log_activity(user.id, "answer received to q3", answer3)
     # index = db.current_question_index(user.id)
     # db.set_user_attribute(user.id, f"questions[{index}].{PREDEFINED_QUESTIONS[2]}", answer3)
-    logger.info(answer3)
     reply_text = PREDEFINED_QUESTIONS[3]
     await update.message.reply_text(reply_text, reply_markup=back_button())
     return HANDLE_PICTURES
@@ -154,9 +156,9 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if message_photo:
         message_id = update.message.id
+        db.log_activity(user.id, "sent a picture", str(message_id))
         user_data['message_ids'].append(message_id)
-        db.wip_questions_collection.update_one({"_id": user.id}, {"$push": {"picture-id": message_id}})
-        logger.info(user_data['message_ids'])
+        db.wip_questions.update_one({"_id": user.id}, {"$push": {"picture-id": message_id}})
         reply_text = "در صورتی که تصویر دیگری ندارید بنویسید 'پایان' در غیر این صورت تصویر ارسال کنید"
         await update.message.reply_text(reply_text)
         return HANDLE_PICTURES
@@ -171,6 +173,7 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
 
     if message_text == "بازگشت":
+        db.log_activity(user.id, "back")
         reply_text = PREDEFINED_QUESTIONS[3]
         await update.message.reply_text(reply_text, reply_markup=back_button())
         return HANDLE_PICTURES
@@ -181,20 +184,23 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     
     if message_text == "پایان":
-        db.log_activity(user.id, "finished asking a question")
+        db.log_activity(user.id, "finished asking question")
+        reply_text = "سوال شما ثبت شد. لطفا منتظر پاسخ کارشناس باشید."
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard())
+        context.job_queue.run_once(send_question_to_expert, when=10, chat_id=user.id, data=user.username)
         return ConversationHandler.END
 
     if message_text and message_text != "پایان":
         db.log_activity(user.id, "entered additional info")
         added_info = message_text
-        logger.info(f"additional info: {added_info}")
-        db.wip_questions_collection.update_one({"_id": user.id}, {"$set": {"additional-information": added_info}})
+        db.wip_questions.update_one({"_id": user.id}, {"$set": {"additional-information": added_info}})
         reply_text = "سوال شما ثبت شد. لطفا منتظر پاسخ کارشناس باشید."
-        await update.message.reply_text(reply_text)
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard())
         context.job_queue.run_once(send_question_to_expert, when=10, chat_id=user.id, data=user.username)
         return ConversationHandler.END
 
-    if not message_text :
+    if not message_text:
+        db.log_activity(user.id, "error - additional info had no text")
         reply_text = "اگه اطلاعات دیگری نداری بنویس پایان"
         await update.message.reply_text(reply_text)
         return ADDITIONAL_INFO

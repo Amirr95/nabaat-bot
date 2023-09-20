@@ -16,8 +16,8 @@ class Database:
         self.activity_collection = self.db["activityCollection"]
         self.token_collection = self.db["tokenCollection"]
         self.dialog_collection = self.db["dialogCollection"]
-        self.wip_questions_collection = self.db["wipQuestionsCollection"]
-        self.fin_questions_collection = self.db["finQuestionsCollection"]
+        self.wip_questions = self.db["wipQuestionsCollection"]
+        self.fin_questions = self.db["finQuestionsCollection"]
         self.required_fields = ["_id", "username", "name", "phone-number"]
 
     def check_if_user_exists(self, user_id: int, raise_exception: bool = False) -> bool:
