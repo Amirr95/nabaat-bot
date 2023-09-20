@@ -1,12 +1,7 @@
-import logging
-from logging.handlers import RotatingFileHandler
-import datetime
 from telegram import Update
 from telegram.ext import (
     CommandHandler,
-    MessageHandler,
     filters,
-    CallbackQueryHandler,
     ContextTypes,
     ApplicationBuilder
 )
@@ -21,38 +16,15 @@ import traceback
 from utils.commands import start
 from utils.register_conv import register_conv_handler
 from utils.ask_question import ask_conv_handler
-# Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    encoding="utf-8",
-    level=logging.INFO,
-    handlers=[
-        RotatingFileHandler(
-            "bot_logs.log", maxBytes=512000, backupCount=5
-        ),  # File handler to write logs to a file
-        logging.StreamHandler(),  # Stream handler to display logs in the console
-    ],
-)
-logger = logging.getLogger("nabaat-bot")
-logging.getLogger("httpx").setLevel(logging.WARNING)
+from utils.logger import logger
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # Constants for ConversationHandler states
+# db = database.Database()
 TOKEN = os.environ["NABAAT_BOT_TOKEN"]
-ADMIN_LIST = [103465015, 31583686, 391763080, 216033407, 5827206050]
-GROUP_IDS = [-1001893146969]
-###################################################################
-###################################################################
-async def create_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    res = await context.bot.create_forum_topic(chat_id=GROUP_IDS[0], name=str(update.effective_user.id))
-    await context.bot.send_message(chat_id=ADMIN_LIST[0], text=res)
-    await context.bot.send_message(chat_id=ADMIN_LIST[0], text=dir(res))
-    # await context.bot.send_message(chat_id=GROUP_IDS[0], text="test message to threadID:81", message_thread_id=81)
-
-async def group_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # if update.message.chat.type=='group':
-    await context.bot.send_message(chat_id=103465015, text=f"update: {update}")
-    await context.bot.forward_message(chat_id=103465015, from_chat_id=update.message.chat_id, message_id=update.message.message_id)
+# ADMIN_LIST = db.get_admins()
+# GROUP_IDS = [-1001893146969]
 
 # Fallback handlers
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -88,7 +60,7 @@ def main():
     # application = ApplicationBuilder().token(TOKEN).proxy_url(proxy_url).get_updates_proxy_url(proxy_url).build()
     # Add handlers to the application
     application.add_error_handler(error_handler)
-    application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('start', start, filters=filters.ChatType.PRIVATE))
     application.add_handler(ask_conv_handler)
     application.add_handler(register_conv_handler)
     # application.add_handler(MessageHandler(filters.ALL, group_handler))
