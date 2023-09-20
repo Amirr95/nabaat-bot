@@ -4,18 +4,23 @@ import os
 
 
 class Database:
+    """Instances establish a connection with the database 
+    (speciefied by env variable MONGODB_URI) and offers 
+    some utility functions
+    """
     def __init__(self) -> None:
         self.client = pymongo.MongoClient(os.environ["MONGODB_URI"])
         self.db = self.client["nabaatBot"]  # database name
         self.user_collection = self.db["userCollection"]
-        self.required_fields = ["_id", "username", "name", "phone-number"]
         self.bot_collection = self.db["botCollection"]
+        self.activity_collection = self.db["activityCollection"]
         self.token_collection = self.db["tokenCollection"]
         self.dialog_collection = self.db["dialogCollection"]
         self.wip_questions_collection = self.db["wipQuestionsCollection"]
         self.fin_questions_collection = self.db["finQuestionsCollection"]
+        self.required_fields = ["_id", "username", "name", "phone-number"]
 
-    def check_if_user_exists(self, user_id: int, raise_exception: bool = False):
+    def check_if_user_exists(self, user_id: int, raise_exception: bool = False) -> bool:
         if self.user_collection.count_documents({"_id": user_id}) > 0:
             return True
         else:
@@ -24,7 +29,7 @@ class Database:
             else:
                 return False
 
-    def check_if_user_is_registered(self, user_id: int):
+    def check_if_user_is_registered(self, user_id: int) -> bool:
         if not self.check_if_user_exists(user_id=user_id):
             return False
         else:
@@ -34,21 +39,20 @@ class Database:
             else:
                 return False
 
-    def check_if_dialog_exists(self, user_id: int, raise_exception: bool = False):
-        if self.dialog_collection.count_documents({"_id": user_id}) > 0:
-            return True
-        else:
-            if raise_exception:
-                raise ValueError(f"User {user_id} does not exist")
-            else:
-                return False
-    
+    def get_admins(self) -> list:
+        """returns a list of admin IDs"""
+        return self.bot_collection.find_one( {"name": "admins-list"} )["admins"]
+
+    def get_experts(self) -> dict:
+        """returns a dict containing expert & groupID as a key/value pair"""
+        return self.bot_collection.find_one( {"name": "experts-list"} )["experts"]
+
     def add_new_user(
         self,
-        user_id,
+        user_id: int,
         username: str = "",
         first_seen: str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    ):
+    ) -> None:
         user_dict = {
             "_id": user_id,
             "username": username,
@@ -59,20 +63,26 @@ class Database:
         if not self.check_if_user_exists(user_id=user_id):
             self.user_collection.insert_one(user_dict)
 
-    def add_new_question(self, user_id, question: str, answer: str):
+    def add_new_question(self, user_id: int, question: str, answer: str) -> None:
         # if not self.wip_questions_collection.find_one( { "_id": user_id } ):
         self.wip_questions_collection.update_one(
             {"_id": user_id},
             {"$set": {question: answer}},
             upsert=True
         )
-    
-    def move_question_to_finished_collection(self, user_id):
+
+    def check_in_progress_qusetions(self, user_id: int) -> bool:
+        if self.wip_questions_collection.find_one( { "_id": user_id} ):
+            return True
+        else:
+            return False
+        
+    def move_question_to_finished_collection(self, user_id: int) -> None:
         document = self.wip_questions_collection.find_one( { "_id": user_id } )
         document["userID"] = document.pop("_id")
         self.fin_questions_collection.insert_one(document)
 
-    def del_from_wip_collection(self, user_id):
+    def del_from_wip_collection(self, user_id) -> None:
         self.wip_questions_collection.delete_one( { "_id": user_id } )
 
     # def current_question_index(self, user_id):
@@ -251,90 +261,14 @@ class Database:
     def log_activity(self, user_id: int, user_activity: str, provided_value: str = ""):
         activity = {
             "user_activity": user_activity,
-            "type": "activity logs",
+            "name": "activity logs",
             "value": provided_value,
             "userID": user_id,
             "username": self.user_collection.find_one({"_id": user_id})["username"],
             "timestamp": datetime.now().strftime("%Y%m%d %H:%M")
         }
-        self.bot_collection.insert_one(activity)
-
-    def get_farms(self, user_id):
-        if not self.check_if_user_is_registered(user_id=user_id):
-            return []
-        user = self.user_collection.find_one( {"_id": user_id} )
-        # provinces = user.get("provinces")
-        # cities = user.get("cities")
-        # villages = user.get("villages")
-        # areas = user.get("areas")
-        # locations = user.get("locations")
-        # equality = len(provinces) == len(cities) == len(villages) == len(areas) == len(locations)
-        farms = user.get("farms")
-        return farms
+        self.activity_collection.insert_one(activity)
     
-    def get_users_with_location(self):
-        pipeline = [
-                {"$match": {"$and": [
-                        { "farms": { "$exists": True } },
-                        { "farms": { "$ne": None } },
-                        { "farms": { "$ne": {} } }
-                        ]
-                    }
-                },
-                {"$addFields": {
-                    "farmsArray": { "$objectToArray": "$farms" }
-                    }
-                },
-                {"$redact": {
-                    "$cond": {
-                        "if": {
-                        "$anyElementTrue": {
-                            "$map": {
-                            "input": "$farmsArray",
-                            "as": "farm",
-                            "in": {
-                                "$and": [
-                                { "$ne": ["$$farm.v.location.latitude", None] },
-                                { "$ne": ["$$farm.v.location.longitude", None] }
-                                ]
-                            }
-                            }
-                        }
-                        },
-                        "then": "$$KEEP",
-                        "else": "$$PRUNE"
-                    }
-                    }
-                },
-                {"$project": {
-                    "_id": 1
-                    }
-                }
-                ]
-
-        cursor = self.user_collection.aggregate(pipeline) # users who have atleast one farm with no location
-        users = [user["_id"] for user in cursor]
-        return users
-
-    def get_users_without_location(self):
-        pipeline = [
-            { "$addFields": { "farmsArray": { "$objectToArray": "$farms" } } },
-            { "$match": { "farmsArray.v.location.latitude": None, "farmsArray.v.location.longitude": None } },
-            { "$project": { "_id": 1 } }
-        ]
-        cursor = self.user_collection.aggregate(pipeline) # users who have atleast one farm with no location
-        users = [user["_id"] for user in cursor]
-        return users
-
-    def get_users_without_phone(self):
-        pipeline = [
-            { "$match": {"$or": [ {"phone-number": None}, {"phone-number": ""} ] } },
-            { "$project": { "_id": 1 } }
-        ]
-        cursor = self.user_collection.aggregate(pipeline) # users with no phone number
-        users = [user["_id"] for user in cursor]
-        return users
-
     def number_of_members(self) -> int:
         members = self.user_collection.distinct("_id")
         return len(members)

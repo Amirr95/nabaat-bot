@@ -17,6 +17,7 @@ import warnings
 
 import database
 from .keyboards import register_keyboard, start_keyboard, back_button
+from .comms import send_question_to_expert
 from .logger import logger
 
 
@@ -190,6 +191,7 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.wip_questions_collection.update_one({"_id": user.id}, {"$set": {"additional-information": added_info}})
         reply_text = "سوال شما ثبت شد. لطفا منتظر پاسخ کارشناس باشید."
         await update.message.reply_text(reply_text)
+        context.job_queue.run_once(send_question_to_expert, when=10, chat_id=user.id, data=user.username)
         return ConversationHandler.END
 
     if not message_text :
