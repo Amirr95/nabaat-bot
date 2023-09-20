@@ -8,4 +8,4 @@
 - install dependencies  
   - `pip install -r requirements.txt`  
 ### Entry script
-cd to the project directory and run `python3 nabaat_bot/main.py`
+move to the project directory and run `python3 nabaat_bot/main.py`
