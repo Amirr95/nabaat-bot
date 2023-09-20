@@ -38,7 +38,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # Constants for ConversationHandler states
-TOKEN = os.environ["AGRIWEATHBOT_TOKEN"]
+TOKEN = os.environ["NABAAT_BOT_TOKEN"]
 ADMIN_LIST = [103465015, 31583686, 391763080, 216033407, 5827206050]
 GROUP_IDS = [-1001893146969]
 ###################################################################
