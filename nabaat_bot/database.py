@@ -65,25 +65,25 @@ class Database:
 
     def add_new_question(self, user_id: int, question: str, answer: str) -> None:
         # if not self.wip_questions_collection.find_one( { "_id": user_id } ):
-        self.wip_questions_collection.update_one(
+        self.wip_questions.update_one(
             {"_id": user_id},
             {"$set": {question: answer}},
             upsert=True
         )
 
     def check_in_progress_qusetions(self, user_id: int) -> bool:
-        if self.wip_questions_collection.find_one( { "_id": user_id} ):
+        if self.wip_questions.find_one( { "_id": user_id} ):
             return True
         else:
             return False
         
     def move_question_to_finished_collection(self, user_id: int) -> None:
-        document = self.wip_questions_collection.find_one( { "_id": user_id } )
+        document = self.wip_questions.find_one( { "_id": user_id } )
         document["userID"] = document.pop("_id")
         self.fin_questions_collection.insert_one(document)
 
     def del_from_wip_collection(self, user_id) -> None:
-        self.wip_questions_collection.delete_one( { "_id": user_id } )
+        self.wip_questions.delete_one( { "_id": user_id } )
 
     # def current_question_index(self, user_id):
     #     user_doc = self.user_collection.find_one({ "_id": user_id })
