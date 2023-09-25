@@ -1,12 +1,17 @@
 import datetime
 from telegram import (
-    Update,
-    ReplyKeyboardMarkup
+    Update
 )
 from telegram.ext import (
     ContextTypes,
     ConversationHandler,
+    CallbackQueryHandler,
+    CommandHandler, 
+    MessageHandler,
+    filters
 )
+from telegram.error import Forbidden, BadRequest
+
 import warnings
 import random
 import string
@@ -17,6 +22,11 @@ from .keyboards import start_keyboard, register_keyboard
 
 
 db = database.Database()
+
+# Conversation states
+RECEIVE_CUSTOMER_MESSAGE = range(1)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_data = context.user_data
@@ -55,3 +65,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply_text, reply_markup=start_keyboard())
         return ConversationHandler.END
 
+
+async def reply_to_expert(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query_data = update.callback_query.data
+    if query_data=="reply_button":
+        user_id = update.callback_query.message.chat.id
+        await context.bot.send_message(chat_id=user_id, text="جوابت به کارشناس چیه؟")
+        return RECEIVE_CUSTOMER_MESSAGE
+
+
+async def receive_customer_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    logger.info(update)
+    question_doc = db.wip_questions.find_one( {'_id': user.id})
+    expert_id = question_doc["expert-id"]
+    group_id = db.get_experts()[str((expert_id))]
+    topic_id = question_doc["topic-id"]
+    if update.message:
+        message_id = update.message.id
+        await context.bot.forward_message(chat_id=group_id, from_chat_id=user.id, message_id=message_id, message_thread_id=topic_id)
+    return ConversationHandler.END
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("عملیات کنسل شد!")
+    return ConversationHandler.END
+
+
+customer_reply_conv_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(reply_to_expert)],
+    states={
+        RECEIVE_CUSTOMER_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_customer_message)]
+    },
+    fallbacks=[CommandHandler("cancel", cancel)],
+)

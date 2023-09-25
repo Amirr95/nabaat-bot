@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import (
     CommandHandler,
+    CallbackQueryHandler,
     filters,
     ContextTypes,
     ApplicationBuilder
@@ -13,16 +14,17 @@ import html
 import json
 import traceback
 
-from utils.commands import start
+from utils.commands import start, customer_reply_conv_handler
 from utils.register_conv import register_conv_handler
 from utils.ask_question import ask_conv_handler
+from utils.comms import expert_reply_conv_handler
 from utils.logger import logger
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 # Constants for ConversationHandler states
 # db = database.Database()
-TOKEN = os.environ["NABAAT_BOT_TOKEN"]
+TOKEN = os.environ["AGRIWEATHBOT_TOKEN"]
 # ADMIN_LIST = db.get_admins()
 # GROUP_IDS = [-1001893146969]
 
@@ -56,13 +58,15 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main():
     proxy_url = 'http://127.0.0.1:8889'
-    application = ApplicationBuilder().token(TOKEN).build()
-    # application = ApplicationBuilder().token(TOKEN).proxy_url(proxy_url).get_updates_proxy_url(proxy_url).build()
+    # application = ApplicationBuilder().token(TOKEN).build()
+    application = ApplicationBuilder().token(TOKEN).proxy_url(proxy_url).get_updates_proxy_url(proxy_url).build()
     # Add handlers to the application
     application.add_error_handler(error_handler)
     application.add_handler(CommandHandler('start', start, filters=filters.ChatType.PRIVATE))
     application.add_handler(ask_conv_handler)
     application.add_handler(register_conv_handler)
+    application.add_handler(expert_reply_conv_handler)
+    application.add_handler(customer_reply_conv_handler)
     # application.add_handler(MessageHandler(filters.ALL, group_handler))
 
     
