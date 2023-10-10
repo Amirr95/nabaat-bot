@@ -39,12 +39,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"{user.username} (id: {user.id}) started the bot.")
         reply_text = """
 سلام
-از این که به ما اعتماد کردید متشکریم.
-برای ارسال سوال به کارشناسان ما، ابتدا ثبت نام خود را کامل کرده
+از این که به گیاه‌پزشکی نبات اعتماد کردید متشکریم.
+برای ارسال سوال به کارشناسان ما، ابتدا ثبت‌نام خود را کامل کرده
 و سپس سوال خود را بپرسید.
 راه‌های ارتباطی با ما:
-ادمین: @nabaatadmin
-تلفن ثابت: 02164063410
                 """
         args = context.args
         if args:
@@ -56,11 +54,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         reply_text = """
 باغدار عزیز سلام
-از این که به ما اعتماد کردید متشکریم.
-می‌توانید سوال خود را بپرسید 
-راه‌های ارتباطی با ما:
-ادمین: @agriiadmin
-تلفن ثابت: 02164063410
+از این که به گیاه‌پزشکی نبات اعتماد کردید متشکریم.
+می‌توانید با انتخاب گزینه «ارسال سوال»، سوال خود را با کارشناسان ما مطرح کنید. 
                 """
         await update.message.reply_text(reply_text, reply_markup=start_keyboard())
         return ConversationHandler.END
@@ -68,22 +63,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def reply_to_expert(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query_data = update.callback_query.data
-    if query_data=="reply_button":
+    user_data = context.user_data
+    if query_data.startswith("reply_button"):
         user_id = update.callback_query.message.chat.id
+        question_num = query_data[-1]
+        user_data["question_num"] = question_num
         await context.bot.send_message(chat_id=user_id, text="جوابت به کارشناس چیه؟")
         return RECEIVE_CUSTOMER_MESSAGE
 
 
 async def receive_customer_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    logger.info(update)
+    user_data = context.user_data
+    question_num = user_data["question_num"]
+    # logger.i/nfo(update)
     question_doc = db.wip_questions.find_one( {'_id': user.id})
-    expert_id = question_doc["expert-id"]
+    expert_id = question_doc[f"question{question_num}"]["expert-id"]
     group_id = db.get_experts()[str((expert_id))]
-    topic_id = question_doc["topic-id"]
+    topic_id = question_doc[f"question{question_num}"]["topic-id"]
     if update.message:
         message_id = update.message.id
         await context.bot.forward_message(chat_id=group_id, from_chat_id=user.id, message_id=message_id, message_thread_id=topic_id)
+        if update.message.text:
+            db.wip_questions.update_one({"_id": user.id},
+                                        {"$push": {f"question{question_num}.messages": {"customer": update.message.text}}})
+        elif update.message.photo:
+            db.wip_questions.update_one({"_id": user.id},
+                                        {"$push": {f"question{question_num}.picture-id": message_id}})
+
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -92,9 +99,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 customer_reply_conv_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(reply_to_expert)],
+    entry_points=[CallbackQueryHandler(reply_to_expert, )],
     states={
-        RECEIVE_CUSTOMER_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_customer_message)]
+        RECEIVE_CUSTOMER_MESSAGE: [MessageHandler(~filters.COMMAND, receive_customer_message)]
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )

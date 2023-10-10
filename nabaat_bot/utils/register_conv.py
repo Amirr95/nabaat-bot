@@ -20,7 +20,7 @@ import database
 db = database.Database()
 
 # Conversation states
-ASK_PHONE, HANDLE_PHONE = range(2)
+ASK_PHONE, HANDLE_PHONE, HANDLE_LOCATION = range(3)
 MENU_CMDS = ['✍️ ثبت نام', '📤 دعوت از دیگران', '🖼 مشاهده باغ ها', '➕ اضافه کردن باغ', '🗑 حذف باغ ها', '✏️ ویرایش باغ ها', '🌦 درخواست اطلاعات هواشناسی', '/start', '/stats', '/send', '/set']
 
 # START OF REGISTER CONVERSATION
@@ -73,10 +73,30 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["phone"] = phone
     db.set_user_attribute(user_id=user.id, key="phone-number", value=phone)
     reply_text = """
-اکنون می‌توانید با انتخاب گزینه <b>(👨‍🌾 ارسال سوال)</b> باغ‌های خود را ثبت کنید.
+لطفا استان، شهرستان و روستای خود را بنویسید.
+لغو با /cancel
+    """
+    await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
+    return HANDLE_LOCATION
+
+async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    user_data = context.user_data
+    # Get the answer to the area question
+    address = update.message.text
+    if address in MENU_CMDS:
+        db.log_activity(user.id, "error - answer in menu_cmd list", address)
+        await update.message.reply_text("عمیلات قبلی لغو شد. لطفا دوباره تلاش کنید.", reply_markup=start_keyboard())
+        return ConversationHandler.END
+    db.log_activity(user.id, "entered phone", address)
+    user_data["address"] = address
+    db.set_user_attribute(user_id=user.id, key="address", value=address)
+    reply_text = """
+ثبت‌نام شما تکمیل شد.
+اکنون می‌توانید با انتخاب گزینه <b>(👨‍🌾 ارسال سوال)</b> مشکل اصلی خود را مطرح کنید.
     """
     keyboard = [['👨‍🌾 ارسال سوال']]
-    
+
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML, reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=False, resize_keyboard=True))
     return ConversationHandler.END
 
@@ -89,9 +109,8 @@ register_conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex("✍️ ثبت نام"), register)],
         states={
             ASK_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_phone)],
-            HANDLE_PHONE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone)
-            ],
+            HANDLE_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone)],
+            HANDLE_LOCATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_location)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
