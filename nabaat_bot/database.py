@@ -51,7 +51,7 @@ class Database:
         self,
         user_id: int,
         username: str = "",
-        first_seen: str = datetime.now().strftime("%Y-%m-%d %H:%M")
+        first_seen: str = datetime.now().strftime("%Y%m%d %H:%M")
     ) -> None:
         user_dict = {
             "_id": user_id,
@@ -63,11 +63,11 @@ class Database:
         if not self.check_if_user_exists(user_id=user_id):
             self.user_collection.insert_one(user_dict)
 
-    def add_new_question(self, user_id: int, question: str, answer: str) -> None:
+    def add_new_question(self, user_id: int, question_name: str, question: str, answer: str) -> None:
         # if not self.wip_questions_collection.find_one( { "_id": user_id } ):
         self.wip_questions.update_one(
             {"_id": user_id},
-            {"$set": {question: answer}},
+            {"$set": {question_name: {question: answer}}},
             upsert=True
         )
 
@@ -80,7 +80,7 @@ class Database:
     def move_question_to_finished_collection(self, user_id: int) -> None:
         document = self.wip_questions.find_one( { "_id": user_id } )
         document["userID"] = document.pop("_id")
-        self.fin_questions_collection.insert_one(document)
+        self.fin_questions.insert_one(document)
 
     def del_from_wip_collection(self, user_id) -> None:
         self.wip_questions.delete_one( { "_id": user_id } )
@@ -133,81 +133,6 @@ class Database:
         else:
             self.user_collection.update_one({"_id": user_id}, {"$push": {key: value}})
 
-    def save_coupon(self, text, value):
-        if not self.bot_collection.find_one( {"_id": "coupons"} ):
-            self.bot_collection.insert_one({"_id": "coupons", 'values': [{text: float(value)}]})
-            return True
-        else:
-            coupons_doc = self.bot_collection.find_one( {"_id": "coupons"} )
-            coupons = [list(coupon.keys())[0] for coupon in coupons_doc["values"]]
-            if text in coupons:
-                return False
-            else:
-                self.bot_collection.update_one({"_id": "coupons"}, {"$push": {'values': {text: float(value)} }})
-                return True
-
-    def verify_coupon(self, coupon: str):
-        coupons_doc = self.bot_collection.find_one( {"_id": "coupons"} )
-        if not coupons_doc:
-            return False
-        coupons = [list(coupon.keys())[0] for coupon in coupons_doc["values"]]
-        if coupon in coupons:
-            return True
-        else: return False
-    
-    def apply_coupon(self, coupon: str, original: float) -> float:
-        coupons_doc = self.bot_collection.find_one( {"_id": "coupons"} )
-        coupons = coupons_doc["values"]
-        for item in coupons:
-            coupon_value = item.get(coupon)
-            if coupon_value:
-                new_value = original - coupon_value
-                return new_value
-        return original
-
-    def log_payment( self,
-                     user_id: int,
-                     used_coupon: str = None,
-                     reason: str = 'subscription',
-                     amount: float = 500000.0,
-                     verified: bool = False,
-                     code: str = ""):
-        current_time = datetime.now().strftime("%Y%m%d %H:%M")
-        payment_dict = {
-            'code': code,
-            'time-approved': current_time,
-            'reason': reason,
-            'amount': amount,
-            'coupon': used_coupon,
-            'verified': verified
-        }
-        self.set_user_attribute(user_id, 'payments', payment_dict, True)
-
-    def add_coupon_to_payment_dict(self, user_id: int, code: str, coupon: str) -> None:
-        filter_query = {'_id': user_id,
-                        'payments': {'$elemMatch': {'code': code} } }
-        update_query = {'$set': { 'payments.$.coupon': coupon } }
-        self.user_collection.update_one(filter_query, update_query)
-
-    def modify_final_price_in_payment_dict(self, user_id: int, code: str, final_price: float) -> None:
-        filter_query = {'_id': user_id,
-                        'payments': {'$elemMatch': {'code': code} } }
-        update_query = {'$set': { 'payments.$.amount': final_price } }
-        self.user_collection.update_one(filter_query, update_query)
-
-    def get_final_price(self, user_id: int, code: str):
-        document = self.user_collection.find_one( {'_id': user_id,
-                                        'payments': {'$elemMatch': {'code': code} }} )
-        payment = next((payment for payment in document['payments'] if payment['code'] == code), None)
-        return payment['amount']
-
-    def verify_payment(self, user_id: int, code: str):
-        filter_query = {'_id': user_id,
-                        'payments': {'$elemMatch': {'code': code} } }
-        update_query = {'$set': { 'payments.$.verified': True } }
-        self.user_collection.update_one(filter_query, update_query)
-        self.set_user_attribute(user_id, 'has-verified-payments', True)
-        
     def log_new_message(
         self,
         user_id,
