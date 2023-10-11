@@ -2,14 +2,12 @@ from telegram import Update
 from telegram.ext import (
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
     filters,
     ContextTypes,
     ApplicationBuilder
 )
 from telegram.constants import ParseMode
 from telegram.error import NetworkError
-from telegram.warnings import PTBUserWarning
 import os
 import warnings
 import html
@@ -23,7 +21,6 @@ from utils.comms import expert_reply_conv_handler
 from utils.logger import logger
 
 warnings.filterwarnings(action="ignore", category=UserWarning)
-
 
 # Constants for ConversationHandler states
 # db = database.Database()

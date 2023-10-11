@@ -8,6 +8,7 @@
 - [x] Back button for pictures. should old IDs be deleted?  
 - [x] Delete message IDs of photos (when?) -> if user presses the back button
 - [x] dockerfile and docker-compose.yml
+- [x] About Nabaat message
 - [ ] CI/CD
 - [ ] Store sent photos
 - [ ] Back button in register

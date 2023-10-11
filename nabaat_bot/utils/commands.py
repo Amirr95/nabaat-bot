@@ -64,11 +64,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def about_us(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     reply_text = """
-<b><a href='https://telegra.ph/%D8%AF%D8%B1%D8%A8%D8%A7%D8%B1%D9%87-%D9%86%D8%A8%D8%A7%D8%AA-10-11'>درباره نبات\r\n\r\n</b>
+<b>درباره نبات:</b>
+مجموعه مشاوره کشاورزی نبات یک شرکت خصوصی دانش بنیان واقع در تهران است که با هدف ارتقا بهره‌وری و کاهش خسارت محصولات کشاورزی، ارتباط بین کشاورزان با متخصصین حوزه کشاورزی را برقرار کرده است. در نبات تعداد زیادی کارشناسان باتجربه و خبره در حوزه‌های باغداری، زراعت، صیفی‌جات و گلخانه در زمینه آفات، بیماری‌ها، تغذیه گیاهی و باغبانی وجود دارند.
 
+با استفاده از نبات می‌توانید بدون نیاز به رفت و آمد و هزینه اضافی، تنها با استفاده از گوشی و ورود به بات تلگرامی نبات، ابتدا ثبت نام خود را به صورت کاملا رایگان انجام دهید و سپس سوال یا مشکل خود را به همراه عکس از گیاه ارسال کنید و جدیدترین توصیه‌های کاربردی را دریافت کنید.
+
+با نبات می‌توانید علی رغم <b>هزینه معقول</b>، سالم‌ترین و باکیفیت‌ترین و بازارپسندترین میوه و محصول را داشته باشید و درختان و مزرعه شما سالم و عاری از هرگونه آفت و بیماری باشد.
+
+ما باور داریم تخصص ما در کنار تجربه ارزشمند شما، کلید موفقیت هر دوی ما است.
 
 """
-    await update.message.reply_text(reply_text, reply_markup=start_keyboard, parse_mode=ParseMode.HTML)
+    await context.bot.send_message(chat_id=user.id, text=reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
 
 
 async def reply_to_expert(update: Update, context: ContextTypes.DEFAULT_TYPE):
