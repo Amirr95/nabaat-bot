@@ -73,7 +73,7 @@ async def handle_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["phone"] = phone
     db.set_user_attribute(user_id=user.id, key="phone-number", value=phone)
     reply_text = """
-لطفا استان، شهرستان و روستای خود را بنویسید.
+نام شهر و روستا که زمین شما در آنجا قرار دارد را وارد کنید\n
 لغو با /cancel
     """
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
@@ -92,8 +92,13 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["address"] = address
     db.set_user_attribute(user_id=user.id, key="address", value=address)
     reply_text = """
-ثبت‌نام شما تکمیل شد.
-اکنون می‌توانید با انتخاب گزینه <b>(👨‍🌾 ارسال سوال)</b> مشکل اصلی خود را مطرح کنید.
+ثبت نام شما با موفقیت انجام شد.
+اکنون میتوانید با انتخاب گزینه <b>(👨‍🌾 ارسال سوال)</b> مشکل اصلی خود را ثبت کنید.
+
+همچنین میتوانید عضو کانال نبات شوید و از محتواهای آموزشی به صورت کاملا رایگان استفاده کنید
+
+لینک عضویت در کانال نبات: https://t.me/nabaatAI
+
     """
     keyboard = [['👨‍🌾 ارسال سوال']]
 

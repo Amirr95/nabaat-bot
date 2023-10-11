@@ -27,10 +27,10 @@ MENU_CMDS = ['✍️ ثبت نام', '📤 دعوت از دیگران', '🖼 م
 db = database.Database()
 # Constants for ConversationHandler states
 PREDEFINED_QUESTIONS = [
-    "لطفا <a href='https://telegra.ph/%D8%B4%D8%B1%D8%A7%DB%8C%D8%B7-%D8%A7%D8%B3%D8%AA%D9%81%D8%A7%D8%AF%D9%87-%D8%A7%D8%B2-%D9%86%D8%A8%D8%A7%D8%AA-10-10-2'>آیین‌نامه</a> نبات را مطالعه کنید\n\n",
-    'لطفا مشکل اصلی خود را مطرح کنید',
-    'pictures?',
-    'additional-info'
+    "<a href='https://telegra.ph/%D8%B4%D8%B1%D8%A7%DB%8C%D8%B7-%D8%A7%D8%B3%D8%AA%D9%81%D8%A7%D8%AF%D9%87-%D8%A7%D8%B2-%D9%86%D8%A8%D8%A7%D8%AA-10-10-2'>آیین‌نامه</a> استفاده از خدمات نبات را خوانده‌ام و آن را می‌پذیرم",
+    'لطفا سوال یا مشکل اصلی خود را مطرح کنید',
+    'لطفا تعدادی عکس واضح از گیاه خود ارسال کنید که بیانگر مشکل و سوال شما باشد. در صورتی که عکس ندارید برای رفتن به مرحله بعد /fin را بزنید.',
+    'اگر توضیح تکمیلی در خصوص سوال خود یا سوابق رسیدگی به زمین یا گیاه دارید بنویسید. در غیر این صورت روی /fin بزنید'
 ]
 (
     MAIN_QUESTION,
@@ -132,6 +132,7 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_photo = update.message.photo
     user_data = context.user_data
     user_data['message_ids'] = []
+    logger.info(message_text)
 
     if update.message.text == "بازگشت":
         db.log_activity(user.id, "back")
@@ -139,7 +140,7 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply_text, reply_markup=back_button())
         return GET_PICTURES
 
-    if message_text == 'پایان':
+    if message_text == '/fin':
         db.log_activity(user.id, "finished sending pictures")
         reply_text = PREDEFINED_QUESTIONS[3]
         await update.message.reply_text(reply_text, reply_markup=back_button())
@@ -150,18 +151,19 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.log_activity(user.id, "sent a picture", str(message_id))
         user_data['message_ids'].append(message_id)
         db.wip_questions.update_one({"_id": user.id}, {"$push": {f"{user_data['question-name']}.picture-id": message_id}})
-        reply_text = "در صورتی که تصویر دیگری ندارید بنویسید 'پایان' در غیر این صورت تصویر ارسال کنید"
+        reply_text = "در صورتی که تصویر دیگری ندارید /fin را بزنید. در غیر این صورت تصویر خود را ارسال کنید."
         await update.message.reply_text(reply_text)
         return HANDLE_PICTURES
 
-    if not update.message.photo and message_text != 'پایان':
-        reply_text = "در صورتی که تصویر دیگری ندارید بنویسید 'پایان' در غیر این صورت تصویر ارسال کنید"
+    if not update.message.photo and message_text != '/fin':
+        reply_text = "در صورتی که تصویر دیگری ندارید /fin را بزنید. در غیر این صورت تصویر خود را ارسال کنید."
         await update.message.reply_text(reply_text, reply_markup=back_button())
         return HANDLE_PICTURES
 
 async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_data = context.user_data
+    job_data = {"username":user.username, "question-name":user_data["question-name"]}
     message_text = update.message.text
 
     if message_text == "بازگشت":
@@ -175,26 +177,27 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("عمیلات قبلی لغو شد. لطفا دوباره تلاش کنید.", reply_markup=start_keyboard())
         return ConversationHandler.END
     
-    if message_text == "پایان":
+    if message_text == "/fin":
         db.log_activity(user.id, "finished asking question")
-        reply_text = "سوال شما ثبت شد. لطفا منتظر پاسخ کارشناس باشید."
+        reply_text = "سوال شما با موفقیت ثبت شد. کارشناسان نبات در اسرع وقت مورد شما را رسیدگی میکنند و خدمت شما پیام ارسال میکنند."
         await update.message.reply_text(reply_text, reply_markup=start_keyboard())
-        context.job_queue.run_once(send_question_to_expert, when=10, chat_id=user.id, data=user.username)
+        context.job_queue.run_once(send_question_to_expert, when=10, chat_id=user.id, 
+                                   data=job_data)
         return ConversationHandler.END
 
-    if message_text and message_text != "پایان":
+    if message_text and message_text != "/fin":
         db.log_activity(user.id, "entered additional info")
         added_info = message_text
         db.wip_questions.update_one({"_id": user.id}, {"$set": {f"{user_data['question-name']}.additional-information": added_info}})
-        reply_text = "سوال شما ثبت شد. لطفا منتظر پاسخ کارشناس باشید."
+        reply_text = "سوال شما با موفقیت ثبت شد. کارشناسان نبات در اسرع وقت مورد شما را رسیدگی میکنند و خدمت شما پیام ارسال میکنند."
         await update.message.reply_text(reply_text, reply_markup=start_keyboard())
         context.job_queue.run_once(send_question_to_expert, when=10, chat_id=user.id, 
-                                   data={"username":user.username, "question-name":user_data["question-name"]})
+                                   data=job_data)
         return ConversationHandler.END
 
     if not message_text:
         db.log_activity(user.id, "error - additional info had no text")
-        reply_text = "اگه اطلاعات دیگری نداری بنویس پایان"
+        reply_text = "اگر اطلاعات تکمیلی دیگری ندارید روی /fin بزنید."
         await update.message.reply_text(reply_text)
         return ADDITIONAL_INFO
 
@@ -209,8 +212,8 @@ ask_conv_handler = ConversationHandler(
             MAIN_QUESTION: [MessageHandler(~filters.COMMAND, main_question)],
             # Q3: [MessageHandler(~filters.COMMAND, q3)],
             GET_PICTURES: [MessageHandler(~filters.COMMAND, get_pictures)],
-            HANDLE_PICTURES: [MessageHandler(~filters.COMMAND, handle_pictures)],
-            ADDITIONAL_INFO: [MessageHandler(~filters.COMMAND, additional_info)],
+            HANDLE_PICTURES: [MessageHandler(filters.ALL, handle_pictures)],
+            ADDITIONAL_INFO: [MessageHandler(filters.ALL, additional_info)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
