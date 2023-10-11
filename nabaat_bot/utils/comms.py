@@ -1,4 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, MessageHandler, filters
 from telegram.error import Forbidden, BadRequest
 import random
@@ -83,7 +84,7 @@ ID مشتری و شماره سوال را از عنوان تاپیک بردار
         return ConversationHandler.END
     user_data["customer_id"] = customer_id
     user_data["question_num"] = question_num
-    reply_text = "چی میخوای به مشتری بگی؟"
+    reply_text = "از کاربر سوال بپرس:\n\nلغو با /cancel"
     await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
     return RECEIVE_MESSAGE
 
@@ -99,7 +100,10 @@ async def receive_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = update.message.text
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("پاسخ به کارشناس", callback_data=f"reply_button{question_num}")]])
         try:
-            await context.bot.send_message(chat_id=customer_id, text=message, reply_markup=markup)
+            await context.bot.send_message(chat_id=customer_id, text= "سوال کارشناس نبات:\r\n\r\n" + f"<pre>{message}</pre>", parse_mode=ParseMode.HTML)
+            await context.bot.send_message(chat_id=customer_id, text="برای پاسخ به کارشناس از دکمه زیر استفاده کنید", reply_markup=markup)
+            await context.bot.send_message(chat_id=group_id, text="سوال شما به کاربر ارسال شد.", 
+                                           message_thread_id=topic_id)
             db.wip_questions.update_one({"_id": customer_id},
                                         {"$push": {f"question{question_num}.messages": {"expert": message}}})
         except Forbidden or BadRequest:
@@ -147,7 +151,7 @@ ID مشتری و شماره سوال را از عنوان تاپیک بردار
         return ConversationHandler.END
     user_data["customer_id"] = customer_id
     user_data["question_num"] = question_num
-    reply_text = "چی میخوای به مشتری بگی؟"
+    reply_text = "توصیه نهایی به کاربر؟\n\nلغو با /cancel"
     await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
     return RECEIVE_MESSAGE
 
@@ -160,10 +164,10 @@ async def receive_final_message(update: Update, context: ContextTypes.DEFAULT_TY
     group_id = experts[str(expert_id)]
     topic_id = update.message.message_thread_id
     if update.message.text:
-        message = "پاسخ کارشناس نبات به سوال شما:\r\n" + update.message.text
+        message = "پاسخ کارشناس نبات به سوال شما:\r\n" + f"<pre>{update.message.text}</pre>"
         # markup = InlineKeyboardMarkup([[InlineKeyboardButton("پاسخ به کارشناس", callback_data=f"reply_button{question_num}")]])
         try:
-            await context.bot.send_message(chat_id=customer_id, text=message)
+            await context.bot.send_message(chat_id=customer_id, text=message, parse_mode=ParseMode.HTML)
             db.wip_questions.update_one({"_id": customer_id},
                                         {"$push": {f"question{question_num}.messages": {"expert": message}}})
         except Forbidden or BadRequest:

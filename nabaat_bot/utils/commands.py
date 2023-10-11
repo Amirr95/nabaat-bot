@@ -75,16 +75,19 @@ async def about_us(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 """
     await context.bot.send_message(chat_id=user.id, text=reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+    db.log_activity(user.id, "viewed about us")
 
 
 async def reply_to_expert(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query_data = update.callback_query.data
+    query = update.callback_query
+    query_data = query.data
     user_data = context.user_data
     if query_data.startswith("reply_button"):
         user_id = update.callback_query.message.chat.id
+        db.log_activity(user_id, "pressed reply_button")
         question_num = query_data[-1]
         user_data["question_num"] = question_num
-        await context.bot.send_message(chat_id=user_id, text="پاسخ خود به کارشناس را وارد کنید")
+        await query.edit_message_text(text="پاسخ خود به کارشناس را وارد کنید")
         return RECEIVE_CUSTOMER_MESSAGE
 
 
@@ -98,6 +101,7 @@ async def receive_customer_message(update: Update, context: ContextTypes.DEFAULT
     group_id = db.get_experts()[str((expert_id))]
     topic_id = question_doc[f"question{question_num}"]["topic-id"]
     if update.message:
+        db.log_activity(user.id, "replied to expert", expert_id)
         message_id = update.message.id
         await context.bot.forward_message(chat_id=group_id, from_chat_id=user.id, message_id=message_id, message_thread_id=topic_id)
         await context.bot.send_message(chat_id=user.id, text="پیام شما به کارشناس نبات ارسال شد")
@@ -117,7 +121,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 customer_reply_conv_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(reply_to_expert, )],
+    entry_points=[CallbackQueryHandler(reply_to_expert, pattern="^reply_button")],
     states={
         RECEIVE_CUSTOMER_MESSAGE: [MessageHandler(~filters.COMMAND, receive_customer_message)]
     },
