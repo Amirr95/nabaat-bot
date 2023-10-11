@@ -4,8 +4,11 @@
 - [x] <s>Copy user's question to finQuestionCollection and get its _id value. Assign 'state'='in progress' to it</s> There are 2 collections for questions: `wip` & `fin`. each user can only have <s>one</s> two document in wip. 
   - [ ] expert needs to set a question status as done to move the document to `fin`
 - [ ] Save messages to database
-- [ ] Fix the messages  
+- [x] Fix the messages  
 - [x] Back button for pictures. should old IDs be deleted?  
 - [x] Delete message IDs of photos (when?) -> if user presses the back button
 - [x] dockerfile and docker-compose.yml
 - [ ] CI/CD
+- [ ] Store sent photos
+- [ ] Back button in register
+- [ ] Prepare for videos
