@@ -16,7 +16,7 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
     question_name = context.job.data["question-name"]
     experts = db.get_experts()
     chosen_expert = random.choice(list(experts.keys()))
-    db.wip_questions.update_one({"_id": 103465015}, {"$set": {f"{question_name}.expert-id": int(chosen_expert)}})
+    db.wip_questions.update_one({"_id": customer_id}, {"$set": {f"{question_name}.expert-id": int(chosen_expert)}})
     group_id = experts[chosen_expert]
     res = await context.bot.create_forum_topic(chat_id=group_id, name=f"{customer_id} | #{question_name[-1]}")
     # logger.info(f"topic-id: {res.message_thread_id}")
