@@ -27,6 +27,20 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
     for q in question_list:
         answer = question[question_name].get(q)
         text = text + "\n" + f"{q}: {answer}"
+    cmd_guide = """
+لیست دستورات بات:
+/ask -> برای ارسال پرسش به کاربر
+/advise-> برای ارسال توصیه نهایی به کاربر
+
+هر دو دستور دو ورودی دارند:
+1- آی‌دی کاربر
+2- شماره سوال
+ که هر دو در اسم تاپیک موجو هستند.
+نحوه استفاده:
+/ask 103465015 1
+/advise 103465015 1
+"""
+    await context.bot.send_message(chat_id=group_id, text=cmd_guide, message_thread_id=res.message_thread_id)
     await context.bot.send_message(chat_id=group_id, text=text, message_thread_id=res.message_thread_id)
     photo_ids = question[question_name].get("picture-id")
     if photo_ids:
@@ -60,6 +74,13 @@ ID مشتری و شماره سوال را از عنوان تاپیک بردار
 """
         await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
         return ConversationHandler.END
+    question_doc = db.wip_questions.find_one({"_id": customer_id})
+    if not question_doc:
+        reply_text = """
+این کاربر سوال فعالی ندارد.
+"""
+        await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
+        return ConversationHandler.END
     user_data["customer_id"] = customer_id
     user_data["question_num"] = question_num
     reply_text = "چی میخوای به مشتری بگی؟"
@@ -84,7 +105,76 @@ async def receive_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Forbidden or BadRequest:
             await context.bot.send_message(chat_id=group_id, text="Couldn't send the message:\n1-User blocked the bot or\n2-User not found", 
                                            message_thread_id=topic_id)
+            db.wip_questions.update_one({"_id": customer_id},
+                                        {"$push": {f"question{question_num}.messages": {"expert": "message not sent"}}})
         finally:            
+            return ConversationHandler.END
+    else:
+        return ConversationHandler.END
+    
+
+async def final_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+    user_data = context.user_data
+    expert_id = update.effective_user.id
+    experts = db.get_experts()
+    group_id = experts[str(expert_id)]
+    topic_id = update.message.message_thread_id
+    # logger.info(f"type: {update.effective_chat.type}")
+    if not args or len(args)!=2:
+        reply_text = """
+نحوه استفاده:
+/advise ID question-number
+example: /advise 103465015 1
+ID مشتری و شماره سوال را از عنوان تاپیک بردار
+"""
+        await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
+        return ConversationHandler.END
+    customer_id = int(args[0])
+    question_num = args[1]
+    if not db.check_if_user_exists(customer_id):
+        reply_text = """
+این ID در دیتابیس موجود نیست.
+"""
+        await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
+        return ConversationHandler.END
+    question_doc = db.wip_questions.find_one({"_id": customer_id})
+    if not question_doc:
+        reply_text = """
+این کاربر سوال فعالی ندارد.
+"""
+        await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
+        return ConversationHandler.END
+    user_data["customer_id"] = customer_id
+    user_data["question_num"] = question_num
+    reply_text = "چی میخوای به مشتری بگی؟"
+    await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
+    return RECEIVE_MESSAGE
+
+async def receive_final_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data = context.user_data
+    customer_id = user_data["customer_id"]
+    question_num = user_data["question_num"]
+    expert_id = update.effective_user.id
+    experts = db.get_experts()
+    group_id = experts[str(expert_id)]
+    topic_id = update.message.message_thread_id
+    if update.message.text:
+        message = "پاسخ کارشناس نبات به سوال شما:\r\n" + update.message.text
+        # markup = InlineKeyboardMarkup([[InlineKeyboardButton("پاسخ به کارشناس", callback_data=f"reply_button{question_num}")]])
+        try:
+            await context.bot.send_message(chat_id=customer_id, text=message)
+            db.wip_questions.update_one({"_id": customer_id},
+                                        {"$push": {f"question{question_num}.messages": {"expert": message}}})
+        except Forbidden or BadRequest:
+            await context.bot.send_message(chat_id=group_id, text="Couldn't send the message:\n1-User blocked the bot or\n2-User not found", 
+                                           message_thread_id=topic_id)
+            db.wip_questions.update_one({"_id": customer_id},
+                                        {"$push": {f"question{question_num}.messages": {"expert": "message not sent"}}})
+        finally:            
+            db.move_question_to_finished_collection(customer_id)
+            db.del_from_wip_collection(customer_id)
+            await context.bot.close_forum_topic(chat_id=group_id, message_thread_id= topic_id)
             return ConversationHandler.END
     else:
         return ConversationHandler.END
@@ -97,6 +187,14 @@ expert_reply_conv_handler = ConversationHandler(
     entry_points=[CommandHandler('ask', ask_message)],
     states={
         RECEIVE_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_message)]
+    },
+    fallbacks=[CommandHandler("cancel", cancel)],
+)
+
+final_advice_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler('advise', final_message)],
+    states={
+        RECEIVE_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_final_message)]
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )

@@ -48,16 +48,16 @@ async def show_disclaimer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_wip_doc = db.wip_questions.find_one({"_id": user.id})
     if not user_wip_doc:
         user_data["question-name"] = "question1"
-    elif user_wip_doc.get("question1") and user_wip_doc.get("question2"):
+    elif user_wip_doc.get("question1"): # and user_wip_doc.get("question2"):
         reply_text = """
-شما دو سوال ثبت کرده‌اید. لطفا پیش از ثبت سوال جدید، منتظر پاسخ کارشناس به سوالات قبلی بمانید.
+شما یک سوال ثبت کرده‌اید. لطفا پیش از ثبت سوال جدید، منتظر پاسخ کارشناس به سوال قبلی بمانید.
 """
         await update.message.reply_text(reply_text, reply_markup=start_keyboard())
         return ConversationHandler.END
     elif not user_wip_doc.get("question1"):
         user_data["question-name"] = "question1"
-    elif not user_wip_doc.get("question2"):
-        user_data["question-name"] = "question2"
+    # elif not user_wip_doc.get("question2"):
+    #     user_data["question-name"] = "question2"
     logger.info(f"{user.id} started a question")
     if not db.check_if_user_is_registered(user_id=user.id):
         db.log_activity(user.id, "error - start question", "not registered yet")

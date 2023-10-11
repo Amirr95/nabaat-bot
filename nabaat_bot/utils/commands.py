@@ -92,7 +92,7 @@ async def receive_customer_message(update: Update, context: ContextTypes.DEFAULT
     user = update.effective_user
     user_data = context.user_data
     question_num = user_data["question_num"]
-    # logger.i/nfo(update)
+    # logger.info(update)
     question_doc = db.wip_questions.find_one( {'_id': user.id})
     expert_id = question_doc[f"question{question_num}"]["expert-id"]
     group_id = db.get_experts()[str((expert_id))]
@@ -100,6 +100,7 @@ async def receive_customer_message(update: Update, context: ContextTypes.DEFAULT
     if update.message:
         message_id = update.message.id
         await context.bot.forward_message(chat_id=group_id, from_chat_id=user.id, message_id=message_id, message_thread_id=topic_id)
+        await context.bot.send_message(chat_id=user.id, text="پیام شما به کارشناس نبات ارسال شد")
         if update.message.text:
             db.wip_questions.update_one({"_id": user.id},
                                         {"$push": {f"question{question_num}.messages": {"customer": update.message.text}}})
