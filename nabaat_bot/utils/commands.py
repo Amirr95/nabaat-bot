@@ -10,7 +10,9 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
+from telegram.constants import ParseMode
 from telegram.error import Forbidden, BadRequest
+from telegram.warnings import PTBUserWarning
 
 import warnings
 import random
@@ -20,7 +22,7 @@ import database
 from .logger import logger
 from .keyboards import start_keyboard, register_keyboard
 
-
+warnings.filterwarnings(action="ignore", message=r".*CallbackQueryHandler", category=PTBUserWarning)
 db = database.Database()
 
 # Conversation states
@@ -39,10 +41,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"{user.username} (id: {user.id}) started the bot.")
         reply_text = """
 سلام
-از این که به گیاه‌پزشکی نبات اعتماد کردید متشکریم.
-برای ارسال سوال به کارشناسان ما، ابتدا ثبت‌نام خود را کامل کرده
-و سپس سوال خود را بپرسید.
-راه‌های ارتباطی با ما:
+از اینکه به پلتفرم مشاوره کشاورزی نبات اعتماد کردید از شما سپاسگذاریم.
+لطفا با انتخاب گزینه «✍️ ثبت نام»، اطلاعات خواسته شده را وارد کنید.
                 """
         args = context.args
         if args:
@@ -53,12 +53,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     else:
         reply_text = """
-باغدار عزیز سلام
-از این که به گیاه‌پزشکی نبات اعتماد کردید متشکریم.
-می‌توانید با انتخاب گزینه «ارسال سوال»، سوال خود را با کارشناسان ما مطرح کنید. 
+سلام
+از اینکه به پلتفرم مشاوره کشاورزی نبات اعتماد کردید از شما سپاسگذاریم.
+می‌توانید با انتخاب گزینه «👨‍🌾 ارسال سوال»، سوال خود را با کارشناسان ما مطرح کنید. 
                 """
         await update.message.reply_text(reply_text, reply_markup=start_keyboard())
         return ConversationHandler.END
+
+
+async def about_us(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    reply_text = """
+<b><a href='https://telegra.ph/%D8%AF%D8%B1%D8%A8%D8%A7%D8%B1%D9%87-%D9%86%D8%A8%D8%A7%D8%AA-10-11'>درباره نبات\r\n\r\n</b>
+
+
+"""
+    await update.message.reply_text(reply_text, reply_markup=start_keyboard, parse_mode=ParseMode.HTML)
 
 
 async def reply_to_expert(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -68,7 +78,7 @@ async def reply_to_expert(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.callback_query.message.chat.id
         question_num = query_data[-1]
         user_data["question_num"] = question_num
-        await context.bot.send_message(chat_id=user_id, text="جوابت به کارشناس چیه؟")
+        await context.bot.send_message(chat_id=user_id, text="پاسخ خود به کارشناس را وارد کنید")
         return RECEIVE_CUSTOMER_MESSAGE
 
 
@@ -92,6 +102,7 @@ async def receive_customer_message(update: Update, context: ContextTypes.DEFAULT
                                         {"$push": {f"question{question_num}.picture-id": message_id}})
 
     return ConversationHandler.END
+
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("عملیات کنسل شد!")

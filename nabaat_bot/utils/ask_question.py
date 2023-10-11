@@ -74,6 +74,7 @@ async def show_disclaimer(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def main_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_data = context.user_data
+    user_data["main-question"] = ""
     if update.message.text == "بازگشت":
         db.log_activity(user.id, "back")
         await update.message.reply_text("عمیلات لغو شد", reply_markup=start_keyboard())
@@ -87,7 +88,6 @@ async def main_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("عمیلات لغو شد.", reply_markup=start_keyboard())
         return ConversationHandler.END
     elif update.message.text == "آیین‌نامه را خواندم و قبول می‌کنم":
-        answer1 = update.message.text
         db.log_activity(user.id, "accepted disclaimer")
         reply_text = PREDEFINED_QUESTIONS[1]
         await update.message.reply_text(reply_text, reply_markup=back_button())
@@ -103,28 +103,33 @@ async def get_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_text = PREDEFINED_QUESTIONS[0]
         await update.message.reply_text(reply_text, reply_markup=disclaimer_keyboard())
         return MAIN_QUESTION
-    if update.message.text in MENU_CMDS:
+    elif update.message.text in MENU_CMDS:
         db.log_activity(user.id, "error - answer in menu_cmd list", update.message.text)
         await update.message.reply_text("عمیلات قبلی لغو شد. لطفا دوباره تلاش کنید.", reply_markup=start_keyboard())
         return ConversationHandler.END
-    if not update.message.text:
+    elif not update.message.text:
         db.log_activity(user.id, "error - no answer received to q3")
         reply_text = PREDEFINED_QUESTIONS[1]
         await update.message.reply_text(reply_text, reply_markup=back_button())
         return MAIN_QUESTION
-    answer = update.message.text
-    # db.wip_questions.update_one({"_id": user.id}, {"$set": {PREDEFINED_QUESTIONS[1]: answer}})
-    user_data['answer'] = answer
-    db.log_activity(user.id, "answer received to main question", answer)
-    db.add_new_question(user.id, user_data["question-name"], PREDEFINED_QUESTIONS[1], answer)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d %H:%M")
-    db.wip_questions.update_one({"_id": user.id}, 
-                                {"$set": {f"{user_data['question-name']}.timestamp": timestamp}})
-    # index = db.current_question_index(user.id)
-    # db.set_user_attribute(user.id, f"questions[{index}].{PREDEFINED_QUESTIONS[2]}", answer3)
-    reply_text = PREDEFINED_QUESTIONS[2]
-    await update.message.reply_text(reply_text, reply_markup=back_button())
-    return HANDLE_PICTURES
+    elif update.message.text != "/fin":
+        user_data["main-question"] = user_data["main-question"] + " " + update.message.text
+        reply_text = "در صورتی که سوالتان ادامه ندارد <b>/fin</b> را بزنید و در غیر این‌صورت ادامه سوال خود را تایپ کنید."
+        await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
+        return GET_PICTURES
+    elif update.message.text == "/fin":
+        user_question = user_data["main-question"]
+        # db.wip_questions.update_one({"_id": user.id}, {"$set": {PREDEFINED_QUESTIONS[1]: answer}})
+        db.log_activity(user.id, "received main question", user_question)
+        db.add_new_question(user.id, user_data["question-name"], PREDEFINED_QUESTIONS[1], user_question)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d %H:%M")
+        db.wip_questions.update_one({"_id": user.id}, 
+                                    {"$set": {f"{user_data['question-name']}.timestamp": timestamp}})
+        # index = db.current_question_index(user.id)
+        # db.set_user_attribute(user.id, f"questions[{index}].{PREDEFINED_QUESTIONS[2]}", answer3)
+        reply_text = PREDEFINED_QUESTIONS[2]
+        await update.message.reply_text(reply_text, reply_markup=back_button())
+        return HANDLE_PICTURES
 
 async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -211,7 +216,7 @@ ask_conv_handler = ConversationHandler(
         states={
             MAIN_QUESTION: [MessageHandler(~filters.COMMAND, main_question)],
             # Q3: [MessageHandler(~filters.COMMAND, q3)],
-            GET_PICTURES: [MessageHandler(~filters.COMMAND, get_pictures)],
+            GET_PICTURES: [MessageHandler(filters.COMMAND | filters.TEXT, get_pictures)],
             HANDLE_PICTURES: [MessageHandler(filters.ALL, handle_pictures)],
             ADDITIONAL_INFO: [MessageHandler(filters.ALL, additional_info)],
         },

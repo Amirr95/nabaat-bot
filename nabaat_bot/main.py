@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import (
     CommandHandler,
+    MessageHandler,
     CallbackQueryHandler,
     filters,
     ContextTypes,
@@ -8,19 +9,21 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 from telegram.error import NetworkError
+from telegram.warnings import PTBUserWarning
 import os
 import warnings
 import html
 import json
 import traceback
 
-from utils.commands import start, customer_reply_conv_handler
+from utils.commands import start, about_us, customer_reply_conv_handler
 from utils.register_conv import register_conv_handler
 from utils.ask_question import ask_conv_handler
 from utils.comms import expert_reply_conv_handler
 from utils.logger import logger
 
-warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings(action="ignore", category=UserWarning)
+
 
 # Constants for ConversationHandler states
 # db = database.Database()
@@ -63,6 +66,7 @@ def main():
     # Add handlers to the application
     application.add_error_handler(error_handler)
     application.add_handler(CommandHandler('start', start, filters=filters.ChatType.PRIVATE))
+    application.add_handler(MessageHandler(filters.Regex("^📬 درباره نبات$"), about_us))
     application.add_handler(ask_conv_handler)
     application.add_handler(register_conv_handler)
     application.add_handler(expert_reply_conv_handler)
