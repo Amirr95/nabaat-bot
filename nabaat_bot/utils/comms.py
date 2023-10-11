@@ -57,7 +57,7 @@ async def ask_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     experts = db.get_experts()
     group_id = experts[str(expert_id)]
     topic_id = update.message.message_thread_id
-    if expert_id not in experts:
+    if str(expert_id) not in experts:
         await context.bot.send_message(chat_id=group_id, text="تنها کارشناسان قادر به استفاده از این دستور هستند.", message_thread_id=topic_id)
         return ConversationHandler.END
     # logger.info(f"type: {update.effective_chat.type}")
@@ -127,7 +127,7 @@ async def final_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     experts = db.get_experts()
     topic_id = update.message.message_thread_id
     group_id = experts[str(expert_id)]
-    if expert_id not in experts:
+    if str(expert_id) not in experts:
         await context.bot.send_message(chat_id=group_id, text="تنها کارشناسان قادر به استفاده از این دستور هستند.", message_thread_id=topic_id)
         return ConversationHandler.END
     # logger.info(f"type: {update.effective_chat.type}")
