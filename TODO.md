@@ -2,7 +2,7 @@
   - [x] Carry responses back & forth  
 - [x] <s>Copy user's question to finQuestionCollection and get its _id value. Assign 'state'='in progress' to it</s> There are 2 collections for questions: `wip` & `fin`. each user can only have <s>one</s> two document in wip. 
   - [x] expert needs to set a question status as done to move the document to `fin`
-- [ ] Expert needs to have a way to send final advice 
+- [x] Expert needs to have a way to send final advice 
 - [x] Save messages to database
 - [x] Fix the messages  
 - [x] Back button for pictures. should old IDs be deleted?  
