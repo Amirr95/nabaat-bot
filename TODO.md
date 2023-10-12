@@ -17,5 +17,5 @@
   - [ ] `wip` questions section
   - [ ] `fin` questions section
 - [ ] Make `/ask` and `/advise` easier to use
-  - [] Send complete commands to be copied, or
-  - [] Make a keyboard  
+  - [ ] Send complete commands to be copied, or
+  - [ ] Make a keyboard  
