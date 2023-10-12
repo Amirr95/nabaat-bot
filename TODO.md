@@ -9,9 +9,7 @@
 - [x] Delete message IDs of photos (when?) -> if user presses the back button
 - [x] dockerfile and docker-compose.yml
 - [x] About Nabaat message
-- [ ] CI/CD
 - [ ] Store sent photos
-- [ ] Back button in register
 - [ ] Prepare for videos
 - [ ] Add a keyboard command in the main menu that shows question history
   - [ ] `wip` questions section
@@ -19,3 +17,5 @@
 - [ ] Make `/ask` and `/advise` easier to use
   - [ ] Send complete commands to be copied, or
   - [ ] Make a keyboard  
+- [ ] Back button in register
+- [ ] CI/CD
