@@ -3,8 +3,14 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, MessageHandler, filters
 from telegram.error import Forbidden, BadRequest
 import random
+import html
+import json
+
 import database
+
 from .logger import logger
+from .keyboards import expert_keyboard
+from .polls import create_poll
 
 db = database.Database()
 
@@ -29,19 +35,11 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
         answer = question[question_name].get(q)
         text = text + "\n" + f"{q}: {answer}"
     cmd_guide = """
-لیست دستورات بات:
-/ask -> برای ارسال پرسش به کاربر
-/advise-> برای ارسال توصیه نهایی به کاربر
-
-هر دو دستور دو ورودی دارند:
-1- آی‌دی کاربر
-2- شماره سوال
- که هر دو در اسم تاپیک موجو هستند.
-نحوه استفاده:
-/ask 103465015 1
-/advise 103465015 1
+تماس با کاربر با دستورات زیر:
+<b>سوال پرسیدن از کاربر با ارسال دستور /msg</b>
+<b>ارسال توصیه نهایی به کاربر با ارسال دستور /advise</b>
 """
-    await context.bot.send_message(chat_id=group_id, text=cmd_guide, message_thread_id=res.message_thread_id)
+    await context.bot.send_message(chat_id=group_id, text=cmd_guide, message_thread_id=res.message_thread_id, parse_mode=ParseMode.HTML)
     await context.bot.send_message(chat_id=group_id, text=text, message_thread_id=res.message_thread_id)
     photo_ids = question[question_name].get("picture-id")
     if photo_ids:
@@ -51,27 +49,17 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=group_id, text="user didn't send any photos", message_thread_id=res.message_thread_id)
 
 async def ask_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    args = context.args
     user_data = context.user_data
     expert_id = update.effective_user.id
     experts = db.get_experts()
     group_id = experts[str(expert_id)]
     topic_id = update.message.message_thread_id
+    topic_name = update.message.reply_to_message.forum_topic_created.name
+    customer_id = int(topic_name.split(" | #")[0])
+    question_num = topic_name.split(" | #")[1]
     if str(expert_id) not in experts:
         await context.bot.send_message(chat_id=group_id, text="تنها کارشناسان قادر به استفاده از این دستور هستند.", message_thread_id=topic_id)
         return ConversationHandler.END
-    # logger.info(f"type: {update.effective_chat.type}")
-    if not args or len(args)!=2:
-        reply_text = """
-نحوه استفاده:
-/ask ID question-number
-example: /ask 103465015 1
-ID مشتری و شماره سوال را از عنوان تاپیک بردار
-"""
-        await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
-        return ConversationHandler.END
-    customer_id = int(args[0])
-    question_num = args[1]
     if not db.check_if_user_exists(customer_id):
         reply_text = """
 این ID در دیتابیس موجود نیست.
@@ -121,27 +109,17 @@ async def receive_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
 
 async def final_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    args = context.args
     user_data = context.user_data
     expert_id = update.effective_user.id
     experts = db.get_experts()
     topic_id = update.message.message_thread_id
     group_id = experts[str(expert_id)]
+    topic_name = update.message.reply_to_message.forum_topic_created.name
+    customer_id = int(topic_name.split(" | #")[0])
+    question_num = topic_name.split(" | #")[1]
     if str(expert_id) not in experts:
         await context.bot.send_message(chat_id=group_id, text="تنها کارشناسان قادر به استفاده از این دستور هستند.", message_thread_id=topic_id)
         return ConversationHandler.END
-    # logger.info(f"type: {update.effective_chat.type}")
-    if not args or len(args)!=2:
-        reply_text = """
-نحوه استفاده:
-/advise ID question-number
-example: /advise 103465015 1
-ID مشتری و شماره سوال را از عنوان تاپیک بردار
-"""
-        await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
-        return ConversationHandler.END
-    customer_id = int(args[0])
-    question_num = args[1]
     if not db.check_if_user_exists(customer_id):
         reply_text = """
 این ID در دیتابیس موجود نیست.
@@ -182,9 +160,16 @@ async def receive_final_message(update: Update, context: ContextTypes.DEFAULT_TY
             db.wip_questions.update_one({"_id": customer_id},
                                         {"$push": {f"question{question_num}.messages": {"expert": "message not sent"}}})
         finally:            
-            db.move_question_to_finished_collection(customer_id)
+            fin_id = db.move_question_to_finished_collection(customer_id)
             db.del_from_wip_collection(customer_id)
-            await context.bot.close_forum_topic(chat_id=group_id, message_thread_id= topic_id)
+            poll_data = {
+                "fin_document_id": fin_id,
+            }
+            try:
+                await context.bot.close_forum_topic(chat_id=group_id, message_thread_id= topic_id)
+            except:
+                pass
+            context.job_queue.run_once(create_poll, when=2, chat_id=customer_id, data=poll_data)
             return ConversationHandler.END
     else:
         return ConversationHandler.END
@@ -194,7 +179,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 expert_reply_conv_handler = ConversationHandler(
-    entry_points=[CommandHandler('ask', ask_message)],
+    entry_points=[CommandHandler('msg', ask_message)],
+    # entry_points=[MessageHandler(filters.Regex("^1$"), ask_message)],
     states={
         RECEIVE_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_message)]
     },
@@ -203,6 +189,7 @@ expert_reply_conv_handler = ConversationHandler(
 
 final_advice_conv_handler = ConversationHandler(
     entry_points=[CommandHandler('advise', final_message)],
+    # entry_points=[MessageHandler(filters.Regex("^2$"), final_message)],
     states={
         RECEIVE_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_final_message)]
     },

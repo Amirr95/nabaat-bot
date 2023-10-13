@@ -1,21 +1,25 @@
 - [x] Send questions to admins 
   - [x] Carry responses back & forth  
-- [x] <s>Copy user's question to finQuestionCollection and get its _id value. Assign 'state'='in progress' to it</s> There are 2 collections for questions: `wip` & `fin`. each user can only have <s>one</s> two document in wip. 
+- [x] <s>Copy customer's question to finQuestionCollection and get its _id value. Assign 'state'='in progress' to it</s> There are 2 collections for questions: `wip` & `fin`. each customer can only have <s>two</s> one document in wip. 
   - [x] expert needs to set a question status as done to move the document to `fin`
 - [x] Expert needs to have a way to send final advice 
 - [x] Save messages to database
 - [x] Fix the messages  
 - [x] Back button for pictures. should old IDs be deleted?  
-- [x] Delete message IDs of photos (when?) -> if user presses the back button
-- [x] dockerfile and docker-compose.yml
+- [x] Delete message IDs of photos (when?) -> if customer presses the back button
+- [x] `dockerfile` and `docker-compose.yml`
 - [x] About Nabaat message
+- [x] `reply_to_expert` should handle multiple messages from the customer
+- [ ] Change final advice message to include a poll on expert performance, also a message letting customer know they can send another question.
+- [ ] Give customer the option to reopen a question??? 
 - [ ] Store sent photos
 - [ ] Prepare for videos
+- [ ] Combine the codes for expert commands `1` & `2`
 - [ ] Add a keyboard command in the main menu that shows question history
   - [ ] `wip` questions section
   - [ ] `fin` questions section
-- [ ] Make `/ask` and `/advise` easier to use
-  - [ ] Send complete commands to be copied, or
-  - [ ] Make a keyboard  
+- [x] Make `/ask` and `/advise` easier to use
+  - [x] Send complete commands to be copied, or
+  - [&cross;] <s>Make a keyboard</s>  
 - [ ] Back button in register
 - [ ] CI/CD

@@ -27,7 +27,7 @@ db = database.Database()
 
 # Conversation states
 RECEIVE_CUSTOMER_MESSAGE = range(1)
-
+MENU_CMD = db.get_menu_cmds()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -100,18 +100,26 @@ async def receive_customer_message(update: Update, context: ContextTypes.DEFAULT
     expert_id = question_doc[f"question{question_num}"]["expert-id"]
     group_id = db.get_experts()[str((expert_id))]
     topic_id = question_doc[f"question{question_num}"]["topic-id"]
+    
+    if update.message.text == "/fin":
+        await context.bot.send_message(chat_id=user.id, text="پیام شما به کارشناس ارسال شد.")
+        return ConversationHandler.END
+
+    if update.message.text in MENU_CMD:
+        pass
+
     if update.message:
         db.log_activity(user.id, "replied to expert", expert_id)
         message_id = update.message.id
         await context.bot.forward_message(chat_id=group_id, from_chat_id=user.id, message_id=message_id, message_thread_id=topic_id)
-        await context.bot.send_message(chat_id=user.id, text="پیام شما به کارشناس نبات ارسال شد")
+        await context.bot.send_message(chat_id=user.id, text="اگر پاسخ کارشناس را کامل کردید روی <b>/fin</b> بزنید و در غیر این صورت پاسخ خود را ادامه دهید.", parse_mode=ParseMode.HTML)
         if update.message.text:
             db.wip_questions.update_one({"_id": user.id},
                                         {"$push": {f"question{question_num}.messages": {"customer": update.message.text}}})
         elif update.message.photo:
             db.wip_questions.update_one({"_id": user.id},
                                         {"$push": {f"question{question_num}.picture-id": message_id}})
-
+        return RECEIVE_CUSTOMER_MESSAGE
     return ConversationHandler.END
 
 
@@ -123,7 +131,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 customer_reply_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(reply_to_expert, pattern="^reply_button")],
     states={
-        RECEIVE_CUSTOMER_MESSAGE: [MessageHandler(~filters.COMMAND, receive_customer_message)]
+        RECEIVE_CUSTOMER_MESSAGE: [MessageHandler(filters.ALL, receive_customer_message)]
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )
