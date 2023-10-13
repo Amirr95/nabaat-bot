@@ -29,8 +29,8 @@ db = database.Database()
 PREDEFINED_QUESTIONS = [
     "<a href='https://telegra.ph/%D8%B4%D8%B1%D8%A7%DB%8C%D8%B7-%D8%A7%D8%B3%D8%AA%D9%81%D8%A7%D8%AF%D9%87-%D8%A7%D8%B2-%D9%86%D8%A8%D8%A7%D8%AA-10-10-2'>آیین‌نامه</a> استفاده از خدمات نبات را خوانده‌ام و آن را می‌پذیرم",
     'لطفا سوال یا مشکل اصلی خود را مطرح کنید',
-    'لطفا تعدادی عکس واضح از گیاه خود ارسال کنید که بیانگر مشکل و سوال شما باشد. در صورتی که عکس ندارید برای رفتن به مرحله بعد /fin را بزنید.',
-    'اگر توضیح تکمیلی در خصوص سوال خود یا سوابق رسیدگی به زمین یا گیاه دارید بنویسید. در غیر این صورت روی /fin بزنید'
+    'لطفا تعدادی عکس واضح از گیاه خود ارسال کنید که بیانگر مشکل و سوال شما باشد. در صورتی که عکس ندارید برای رفتن به مرحله بعد <b>/fin</b> را بزنید.',
+    'اگر توضیح تکمیلی در خصوص سوال خود یا سوابق رسیدگی به زمین یا گیاه دارید بنویسید. در غیر این صورت روی <b>/fin</b> بزنید'
 ]
 (
     MAIN_QUESTION,
@@ -128,7 +128,7 @@ async def get_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # index = db.current_question_index(user.id)
         # db.set_user_attribute(user.id, f"questions[{index}].{PREDEFINED_QUESTIONS[2]}", answer3)
         reply_text = PREDEFINED_QUESTIONS[2]
-        await update.message.reply_text(reply_text, reply_markup=back_button())
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
         return HANDLE_PICTURES
 
 async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -147,7 +147,7 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message_text == '/fin':
         db.log_activity(user.id, "finished sending pictures")
         reply_text = PREDEFINED_QUESTIONS[3]
-        await update.message.reply_text(reply_text, reply_markup=back_button())
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
         return ADDITIONAL_INFO
     
     if message_photo:
@@ -155,13 +155,13 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.log_activity(user.id, "sent a picture", str(message_id))
         user_data['message_ids'].append(message_id)
         db.wip_questions.update_one({"_id": user.id}, {"$push": {f"{user_data['question-name']}.picture-id": message_id}})
-        reply_text = "در صورتی که تصویر دیگری ندارید /fin را بزنید. در غیر این صورت تصویر خود را ارسال کنید."
-        await update.message.reply_text(reply_text)
+        reply_text = "در صورتی که تصویر دیگری ندارید <b>/fin</b> را بزنید. در غیر این صورت تصویر خود را ارسال کنید."
+        await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
         return HANDLE_PICTURES
 
     if not update.message.photo and message_text != '/fin':
-        reply_text = "در صورتی که تصویر دیگری ندارید /fin را بزنید. در غیر این صورت تصویر خود را ارسال کنید."
-        await update.message.reply_text(reply_text, reply_markup=back_button())
+        reply_text = "در صورتی که تصویر دیگری ندارید <b>/fin</b> را بزنید. در غیر این صورت تصویر خود را ارسال کنید."
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
         return HANDLE_PICTURES
 
 async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -173,7 +173,7 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message_text == "بازگشت":
         db.log_activity(user.id, "back")
         reply_text = PREDEFINED_QUESTIONS[2]
-        await update.message.reply_text(reply_text, reply_markup=back_button())
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
         return HANDLE_PICTURES
 
     if message_text in MENU_CMDS:
@@ -201,8 +201,8 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not message_text:
         db.log_activity(user.id, "error - additional info had no text")
-        reply_text = "اگر اطلاعات تکمیلی دیگری ندارید روی /fin بزنید."
-        await update.message.reply_text(reply_text)
+        reply_text = "اگر اطلاعات تکمیلی دیگری ندارید روی <b>/fin</b> بزنید."
+        await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
         return ADDITIONAL_INFO
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
