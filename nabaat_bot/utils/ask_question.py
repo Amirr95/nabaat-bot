@@ -137,7 +137,6 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_photo = update.message.photo
     user_data = context.user_data
     user_data['message_ids'] = []
-    logger.info(message_text)
 
     if update.message.text == "بازگشت":
         db.log_activity(user.id, "back")
