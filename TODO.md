@@ -10,7 +10,8 @@
 - [x] `dockerfile` and `docker-compose.yml`
 - [x] About Nabaat message
 - [x] `reply_to_expert` should handle multiple messages from the customer
-- [ ] Change final advice message to include a poll on expert performance, also a message letting customer know they can send another question.
+- [x] Change final advice message to include a poll on expert performance, also a message letting customer know they can send another question.
+- [ ] Payment functionality
 - [ ] Give customer the option to reopen a question??? 
 - [ ] Store sent photos
 - [ ] Prepare for videos
