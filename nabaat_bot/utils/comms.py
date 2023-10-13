@@ -9,7 +9,7 @@ import json
 import database
 
 from .logger import logger
-from .keyboards import expert_keyboard
+from .keyboards import expert_keyboard, start_keyboard
 from .polls import create_poll
 
 db = database.Database()
@@ -148,10 +148,11 @@ async def receive_final_message(update: Update, context: ContextTypes.DEFAULT_TY
     group_id = experts[str(expert_id)]
     topic_id = update.message.message_thread_id
     if update.message.text:
-        message = "پاسخ کارشناس نبات به سوال شما:\r\n" + f"<pre>{update.message.text}</pre>"
+        message = "پاسخ نهایی کارشناس نبات به سوال شما:\r\n" + f"<pre>{update.message.text}</pre>"
         # markup = InlineKeyboardMarkup([[InlineKeyboardButton("پاسخ به کارشناس", callback_data=f"reply_button{question_num}")]])
         try:
             await context.bot.send_message(chat_id=customer_id, text=message, parse_mode=ParseMode.HTML)
+            await context.bot.send_message(chat_id=customer_id, text="اکنون می‌توانید با انتخاب مجدد گزینه <b>(👨‍🌾 ارسال سوال)</b> سوالات دیگر خود را با ما مطرح کنید.", reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
             db.wip_questions.update_one({"_id": customer_id},
                                         {"$push": {f"question{question_num}.messages": {"expert": message}}})
         except Forbidden or BadRequest:

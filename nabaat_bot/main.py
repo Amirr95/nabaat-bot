@@ -60,8 +60,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main():
     proxy_url = 'http://127.0.0.1:8889'
-    # application = ApplicationBuilder().token(TOKEN).build()
-    application = ApplicationBuilder().token(TOKEN).proxy_url(proxy_url).get_updates_proxy_url(proxy_url).build()
+    application = ApplicationBuilder().token(TOKEN).build()
+    # application = ApplicationBuilder().token(TOKEN).proxy_url(proxy_url).get_updates_proxy_url(proxy_url).build()
     # Add handlers to the application
     application.add_error_handler(error_handler)
     application.add_handler(CommandHandler('start', start, filters=filters.ChatType.PRIVATE))
