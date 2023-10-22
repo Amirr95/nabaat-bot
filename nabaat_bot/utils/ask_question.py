@@ -79,7 +79,7 @@ async def main_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.log_activity(user.id, "back")
         await update.message.reply_text("عمیلات لغو شد", reply_markup=start_keyboard())
         return ConversationHandler.END
-    if update.message.text in MENU_CMDS or update.message.text == "قبول نمی‌کنم":
+    if update.message.text in MENU_CMDS:
         db.log_activity(user.id, "error - answer in menu_cmd list", update.message.text)
         await update.message.reply_text("عمیلات لغو شد.", reply_markup=start_keyboard())
         return ConversationHandler.END
@@ -93,7 +93,9 @@ async def main_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply_text, reply_markup=back_button())
         return GET_PICTURES
     else:
-        return ConversationHandler.END 
+        reply_text = PREDEFINED_QUESTIONS[0]
+        await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML,reply_markup=disclaimer_keyboard())
+        return MAIN_QUESTION 
 
 async def get_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
