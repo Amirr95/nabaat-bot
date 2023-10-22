@@ -36,8 +36,8 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
         text = text + "\n" + f"{q}: {answer}"
     cmd_guide = """
 تماس با کاربر با دستورات زیر:
-<b>سوال پرسیدن از کاربر با ارسال دستور /msg</b>
-<b>ارسال توصیه نهایی به کاربر با ارسال دستور /advise</b>
+<b>پیام دادن به کاربر با ارسال دستور /msg</b>
+<b>پایان رسیدگی به سوال و بستن تاپیک با ارسال دستوز /close</b>
 """
     await context.bot.send_message(chat_id=group_id, text=cmd_guide, message_thread_id=res.message_thread_id, parse_mode=ParseMode.HTML)
     await context.bot.send_message(chat_id=group_id, text=text, message_thread_id=res.message_thread_id)
@@ -108,7 +108,7 @@ async def receive_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     
 
-async def final_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def close_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = context.user_data
     expert_id = update.effective_user.id
     experts = db.get_experts()
@@ -135,45 +135,25 @@ async def final_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     user_data["customer_id"] = customer_id
     user_data["question_num"] = question_num
-    reply_text = "توصیه نهایی به کاربر؟\n\nلغو با /cancel"
-    await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
-    return RECEIVE_MESSAGE
-
-async def receive_final_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_data = context.user_data
-    customer_id = user_data["customer_id"]
-    question_num = user_data["question_num"]
-    expert_id = update.effective_user.id
-    experts = db.get_experts()
-    group_id = experts[str(expert_id)]
-    topic_id = update.message.message_thread_id
-    if update.message.text:
-        message = "پاسخ نهایی کارشناس نبات به سوال شما:\r\n" + f"<pre>{update.message.text}</pre>"
-        # markup = InlineKeyboardMarkup([[InlineKeyboardButton("پاسخ به کارشناس", callback_data=f"reply_button{question_num}")]])
+    # reply_text = "توصیه نهایی به کاربر؟\n\nلغو با /cancel"
+    # await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
+    try:
+        await context.bot.send_message(chat_id=customer_id, text="فرایند پاسخ‌دهی به سوال شما تکمیل شده است.\nاکنون می‌توانید با انتخاب مجدد گزینه <b>(👨‍🌾 ارسال سوال)</b> سوالات دیگر خود را با کارشناسان نبات مطرح کنید.\nبا شرکت در نظرسنجی به بهبود عملکرد ما کمک کنید.", reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+    except Forbidden or BadRequest:
+        await context.bot.send_message(chat_id=group_id, text="Couldn't send the closing message:\n1-User blocked the bot or\n2-User not found", 
+                                        message_thread_id=topic_id)
+    finally:            
+        fin_id = db.move_question_to_finished_collection(customer_id)
+        db.del_from_wip_collection(customer_id)
+        poll_data = {
+            "fin_document_id": fin_id,
+        }
         try:
-            await context.bot.send_message(chat_id=customer_id, text=message, parse_mode=ParseMode.HTML)
-            await context.bot.send_message(chat_id=customer_id, text="اکنون می‌توانید با انتخاب مجدد گزینه <b>(👨‍🌾 ارسال سوال)</b> سوالات دیگر خود را با ما مطرح کنید.", reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
-            db.wip_questions.update_one({"_id": customer_id},
-                                        {"$push": {f"question{question_num}.messages": {"expert": message}}})
-        except Forbidden or BadRequest:
-            await context.bot.send_message(chat_id=group_id, text="Couldn't send the message:\n1-User blocked the bot or\n2-User not found", 
-                                           message_thread_id=topic_id)
-            db.wip_questions.update_one({"_id": customer_id},
-                                        {"$push": {f"question{question_num}.messages": {"expert": "message not sent"}}})
-        finally:            
-            fin_id = db.move_question_to_finished_collection(customer_id)
-            db.del_from_wip_collection(customer_id)
-            poll_data = {
-                "fin_document_id": fin_id,
-            }
-            try:
-                await context.bot.close_forum_topic(chat_id=group_id, message_thread_id= topic_id)
-            except:
-                pass
-            context.job_queue.run_once(create_poll, when=2, chat_id=customer_id, data=poll_data)
-            return ConversationHandler.END
-    else:
-        return ConversationHandler.END
+            await context.bot.close_forum_topic(chat_id=group_id, message_thread_id= topic_id)
+        except:
+            pass
+        context.job_queue.run_once(create_poll, when=2, chat_id=customer_id, data=poll_data)
+
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("عملیات کنسل شد!")
@@ -184,15 +164,6 @@ expert_reply_conv_handler = ConversationHandler(
     # entry_points=[MessageHandler(filters.Regex("^1$"), ask_message)],
     states={
         RECEIVE_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_message)]
-    },
-    fallbacks=[CommandHandler("cancel", cancel)],
-)
-
-final_advice_conv_handler = ConversationHandler(
-    entry_points=[CommandHandler('advise', final_message)],
-    # entry_points=[MessageHandler(filters.Regex("^2$"), final_message)],
-    states={
-        RECEIVE_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_final_message)]
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )

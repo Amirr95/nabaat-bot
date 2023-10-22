@@ -192,7 +192,8 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message_text and message_text != "/fin":
         db.log_activity(user.id, "entered additional info")
         added_info = message_text
-        db.wip_questions.update_one({"_id": user.id}, {"$set": {f"{user_data['question-name']}.additional-information": added_info}})
+        key = "اطلاعات تکمیلی"
+        db.wip_questions.update_one({"_id": user.id}, {"$set": {f"{user_data['question-name']}.{key}": added_info}})
         reply_text = "سوال شما با موفقیت ثبت شد. کارشناسان نبات در اسرع وقت مورد شما را رسیدگی میکنند و خدمت شما پیام ارسال میکنند."
         await update.message.reply_text(reply_text, reply_markup=start_keyboard())
         context.job_queue.run_once(send_question_to_expert, when=1, chat_id=user.id, 
