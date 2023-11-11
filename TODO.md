@@ -2,20 +2,20 @@
   - [x] Carry responses back & forth  
 - [x] <s>Copy user's question to finQuestionCollection and get its _id value. Assign 'state'='in progress' to it</s> There are 2 collections for questions: `wip` & `fin`. each user can only have <s>one</s> two document in wip. 
   - [x] expert needs to set a question status as done to move the document to `fin`
-- [ ] Expert needs to have a way to send final advice 
+- [x] Expert needs to have a way to send final advice 
 - [x] Save messages to database
 - [x] Fix the messages  
 - [x] Back button for pictures. should old IDs be deleted?  
 - [x] Delete message IDs of photos (when?) -> if user presses the back button
 - [x] dockerfile and docker-compose.yml
 - [x] About Nabaat message
-- [ ] CI/CD
+- [x] CI/CD
 - [ ] Store sent photos
 - [ ] Back button in register
-- [ ] Prepare for videos
+- [ ] Prepare for videos and voice
 - [ ] Add a keyboard command in the main menu that shows question history
   - [ ] `wip` questions section
   - [ ] `fin` questions section
-- [ ] Make `/ask` and `/advise` easier to use
-  - [] Send complete commands to be copied, or
-  - [] Make a keyboard  
+- [x] Make `/ask` and `/advise` easier to use
+  - [x] Send complete commands to be copied, or
+  - [] <s>Make a keyboard</s>
