@@ -5,6 +5,12 @@ def start_keyboard_future():
     return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True)
 
 
+
+def expert_keyboard():
+    keyboard = [ ['سوال از کاربر'], ['ارسال توصیه نهایی']]
+    return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+
+
 def start_keyboard():
     keyboard = [ ['👨‍🌾 ارسال سوال'], ['📬 درباره نبات']]
     return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)

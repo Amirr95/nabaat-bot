@@ -27,7 +27,7 @@ db = database.Database()
 
 # Conversation states
 RECEIVE_CUSTOMER_MESSAGE = range(1)
-
+MENU_CMD = db.get_menu_cmds()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -97,21 +97,39 @@ async def receive_customer_message(update: Update, context: ContextTypes.DEFAULT
     question_num = user_data["question_num"]
     # logger.info(update)
     question_doc = db.wip_questions.find_one( {'_id': user.id})
-    expert_id = question_doc[f"question{question_num}"]["expert-id"]
-    group_id = db.get_experts()[str((expert_id))]
-    topic_id = question_doc[f"question{question_num}"]["topic-id"]
+    try:
+        expert_id = question_doc[f"question{question_num}"]["expert-id"]
+        group_id = db.get_experts()[str((expert_id))]
+        topic_id = question_doc[f"question{question_num}"]["topic-id"]
+    except TypeError:
+        db.log_activity(user.id, "replied to expert but topic was closed")
+        logger.error(f"user {user.id} tried to send a message to a closed topic")
+        return ConversationHandler.END
+    
+    if update.message.text == "/fin":
+        await context.bot.send_message(chat_id=user.id, text="پیام شما به کارشناس ارسال شد.")
+        return ConversationHandler.END
+
+    if update.message.text in MENU_CMD:
+        db.log_activity(user.id, "error - answer in menu_cmd list", update.message.text)
+        await update.message.reply_text("عمیلات لغو شد.", reply_markup=start_keyboard())
+        return ConversationHandler.END
+
     if update.message:
         db.log_activity(user.id, "replied to expert", expert_id)
         message_id = update.message.id
-        await context.bot.forward_message(chat_id=group_id, from_chat_id=user.id, message_id=message_id, message_thread_id=topic_id)
-        await context.bot.send_message(chat_id=user.id, text="پیام شما به کارشناس نبات ارسال شد")
+        try:
+            await context.bot.forward_message(chat_id=group_id, from_chat_id=user.id, message_id=message_id, message_thread_id=topic_id)
+            await context.bot.send_message(chat_id=user.id, text="اگر پاسخ کارشناس را کامل کردید روی <b>/fin</b> بزنید و در غیر این صورت پاسخ خود را ادامه دهید.", parse_mode=ParseMode.HTML)
+        except (Forbidden, BadRequest):
+            logger.error(f"problem with sending message - user: {user.id} \ngroupID: {group_id}, topicID: {topic_id}")
         if update.message.text:
             db.wip_questions.update_one({"_id": user.id},
                                         {"$push": {f"question{question_num}.messages": {"customer": update.message.text}}})
         elif update.message.photo:
             db.wip_questions.update_one({"_id": user.id},
                                         {"$push": {f"question{question_num}.picture-id": message_id}})
-
+        return RECEIVE_CUSTOMER_MESSAGE
     return ConversationHandler.END
 
 
@@ -123,7 +141,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 customer_reply_conv_handler = ConversationHandler(
     entry_points=[CallbackQueryHandler(reply_to_expert, pattern="^reply_button")],
     states={
-        RECEIVE_CUSTOMER_MESSAGE: [MessageHandler(~filters.COMMAND, receive_customer_message)]
+        RECEIVE_CUSTOMER_MESSAGE: [MessageHandler(filters.ALL, receive_customer_message)]
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )

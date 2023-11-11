@@ -3,8 +3,14 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ConversationHandler, CommandHandler, MessageHandler, filters
 from telegram.error import Forbidden, BadRequest
 import random
+import html
+import json
+
 import database
+
 from .logger import logger
+from .keyboards import expert_keyboard, start_keyboard
+from .polls import create_poll
 
 db = database.Database()
 
@@ -29,19 +35,11 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
         answer = question[question_name].get(q)
         text = text + "\n" + f"{q}: {answer}"
     cmd_guide = """
-لیست دستورات بات:
-/ask -> برای ارسال پرسش به کاربر
-/advise-> برای ارسال توصیه نهایی به کاربر
-
-هر دو دستور دو ورودی دارند:
-1- آی‌دی کاربر
-2- شماره سوال
- که هر دو در اسم تاپیک موجو هستند.
-نحوه استفاده:
-/ask 103465015 1
-/advise 103465015 1
+تماس با کاربر با دستورات زیر:
+<b>پیام دادن به کاربر با ارسال دستور /msg</b>
+<b>پایان رسیدگی به سوال و بستن تاپیک با ارسال دستوز /close</b>
 """
-    await context.bot.send_message(chat_id=group_id, text=cmd_guide, message_thread_id=res.message_thread_id)
+    await context.bot.send_message(chat_id=group_id, text=cmd_guide, message_thread_id=res.message_thread_id, parse_mode=ParseMode.HTML)
     await context.bot.send_message(chat_id=group_id, text=text, message_thread_id=res.message_thread_id)
     photo_ids = question[question_name].get("picture-id")
     if photo_ids:
@@ -51,27 +49,17 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=group_id, text="user didn't send any photos", message_thread_id=res.message_thread_id)
 
 async def ask_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    args = context.args
     user_data = context.user_data
     expert_id = update.effective_user.id
     experts = db.get_experts()
     group_id = experts[str(expert_id)]
     topic_id = update.message.message_thread_id
+    topic_name = update.message.reply_to_message.forum_topic_created.name
+    customer_id = int(topic_name.split(" | #")[0])
+    question_num = topic_name.split(" | #")[1]
     if str(expert_id) not in experts:
         await context.bot.send_message(chat_id=group_id, text="تنها کارشناسان قادر به استفاده از این دستور هستند.", message_thread_id=topic_id)
         return ConversationHandler.END
-    # logger.info(f"type: {update.effective_chat.type}")
-    if not args or len(args)!=2:
-        reply_text = """
-نحوه استفاده:
-/ask ID question-number
-example: /ask 103465015 1
-ID مشتری و شماره سوال را از عنوان تاپیک بردار
-"""
-        await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
-        return ConversationHandler.END
-    customer_id = int(args[0])
-    question_num = args[1]
     if not db.check_if_user_exists(customer_id):
         reply_text = """
 این ID در دیتابیس موجود نیست.
@@ -120,28 +108,18 @@ async def receive_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     
 
-async def final_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    args = context.args
+async def close_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = context.user_data
     expert_id = update.effective_user.id
     experts = db.get_experts()
     topic_id = update.message.message_thread_id
     group_id = experts[str(expert_id)]
+    topic_name = update.message.reply_to_message.forum_topic_created.name
+    customer_id = int(topic_name.split(" | #")[0])
+    question_num = topic_name.split(" | #")[1]
     if str(expert_id) not in experts:
         await context.bot.send_message(chat_id=group_id, text="تنها کارشناسان قادر به استفاده از این دستور هستند.", message_thread_id=topic_id)
         return ConversationHandler.END
-    # logger.info(f"type: {update.effective_chat.type}")
-    if not args or len(args)!=2:
-        reply_text = """
-نحوه استفاده:
-/advise ID question-number
-example: /advise 103465015 1
-ID مشتری و شماره سوال را از عنوان تاپیک بردار
-"""
-        await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
-        return ConversationHandler.END
-    customer_id = int(args[0])
-    question_num = args[1]
     if not db.check_if_user_exists(customer_id):
         reply_text = """
 این ID در دیتابیس موجود نیست.
@@ -157,54 +135,35 @@ ID مشتری و شماره سوال را از عنوان تاپیک بردار
         return ConversationHandler.END
     user_data["customer_id"] = customer_id
     user_data["question_num"] = question_num
-    reply_text = "توصیه نهایی به کاربر؟\n\nلغو با /cancel"
-    await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
-    return RECEIVE_MESSAGE
-
-async def receive_final_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_data = context.user_data
-    customer_id = user_data["customer_id"]
-    question_num = user_data["question_num"]
-    expert_id = update.effective_user.id
-    experts = db.get_experts()
-    group_id = experts[str(expert_id)]
-    topic_id = update.message.message_thread_id
-    if update.message.text:
-        message = "پاسخ کارشناس نبات به سوال شما:\r\n" + f"<pre>{update.message.text}</pre>"
-        # markup = InlineKeyboardMarkup([[InlineKeyboardButton("پاسخ به کارشناس", callback_data=f"reply_button{question_num}")]])
+    # reply_text = "توصیه نهایی به کاربر؟\n\nلغو با /cancel"
+    # await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
+    try:
+        await context.bot.send_message(chat_id=customer_id, text="فرایند پاسخ‌دهی به سوال شما تکمیل شده است.\nاکنون می‌توانید با انتخاب مجدد گزینه <b>(👨‍🌾 ارسال سوال)</b> سوالات دیگر خود را با کارشناسان نبات مطرح کنید.\nبا شرکت در نظرسنجی به بهبود عملکرد ما کمک کنید.", reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+    except Forbidden or BadRequest:
+        await context.bot.send_message(chat_id=group_id, text="Couldn't send the closing message:\n1-User blocked the bot or\n2-User not found", 
+                                        message_thread_id=topic_id)
+    finally:            
+        fin_id = db.move_question_to_finished_collection(customer_id)
+        db.del_from_wip_collection(customer_id)
+        poll_data = {
+            "fin_document_id": fin_id,
+        }
         try:
-            await context.bot.send_message(chat_id=customer_id, text=message, parse_mode=ParseMode.HTML)
-            db.wip_questions.update_one({"_id": customer_id},
-                                        {"$push": {f"question{question_num}.messages": {"expert": message}}})
-        except Forbidden or BadRequest:
-            await context.bot.send_message(chat_id=group_id, text="Couldn't send the message:\n1-User blocked the bot or\n2-User not found", 
-                                           message_thread_id=topic_id)
-            db.wip_questions.update_one({"_id": customer_id},
-                                        {"$push": {f"question{question_num}.messages": {"expert": "message not sent"}}})
-        finally:            
-            db.move_question_to_finished_collection(customer_id)
-            db.del_from_wip_collection(customer_id)
             await context.bot.close_forum_topic(chat_id=group_id, message_thread_id= topic_id)
-            return ConversationHandler.END
-    else:
-        return ConversationHandler.END
+        except:
+            pass
+        context.job_queue.run_once(create_poll, when=2, chat_id=customer_id, data=poll_data)
+
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("عملیات کنسل شد!")
     return ConversationHandler.END
 
 expert_reply_conv_handler = ConversationHandler(
-    entry_points=[CommandHandler('ask', ask_message)],
+    entry_points=[CommandHandler('msg', ask_message)],
+    # entry_points=[MessageHandler(filters.Regex("^1$"), ask_message)],
     states={
         RECEIVE_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_message)]
-    },
-    fallbacks=[CommandHandler("cancel", cancel)],
-)
-
-final_advice_conv_handler = ConversationHandler(
-    entry_points=[CommandHandler('advise', final_message)],
-    states={
-        RECEIVE_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_final_message)]
     },
     fallbacks=[CommandHandler("cancel", cancel)],
 )

@@ -1,5 +1,6 @@
 import pymongo
 from datetime import datetime
+from bson.objectid import ObjectId
 import os
 
 
@@ -41,12 +42,36 @@ class Database:
 
     def get_admins(self) -> list:
         """returns a list of admin IDs"""
-        return self.bot_collection.find_one( {"name": "admins-list"} )["admins"]
-
+        document = self.bot_collection.find_one( {"name": "admins-list"} )
+        if document:
+            return document.get("admins")
+        else: 
+            return []
+            
     def get_experts(self) -> dict:
         """returns a dict containing expert & groupID as a key/value pair"""
-        return self.bot_collection.find_one( {"name": "experts-list"} )["experts"]
-
+        document = self.bot_collection.find_one( {"name": "experts-list"} )
+        if document:
+            return document.get("experts")
+        else: 
+            return {}
+            
+    def get_developers(self) -> list:
+        """returns a list of developer IDs. Used to send them error messages"""
+        document = self.bot_collection.find_one( {"name": "developers-list"} )
+        if document:
+            return document.get("developers")
+        else: 
+            return []
+            
+    def get_menu_cmds(self) -> list:
+        """returns list of bot commands. Used to end ongoing conversations if encountered."""
+        document = self.bot_collection.find_one( {"name": "commands-list"} )
+        if document:
+            return document.get("commands")
+        else: 
+            return []
+        
     def add_new_user(
         self,
         user_id: int,
@@ -77,10 +102,14 @@ class Database:
         else:
             return False
         
-    def move_question_to_finished_collection(self, user_id: int) -> None:
+    def move_question_to_finished_collection(self, user_id: int) -> ObjectId:
+        """After a nabaat expert sends their final advice, this function removes the question document from wip_collection
+        and moves it to fin_collection and returns the ObjectId of the inserted document
+        """
         document = self.wip_questions.find_one( { "_id": user_id } )
         document["userID"] = document.pop("_id")
-        self.fin_questions.insert_one(document)
+        res = self.fin_questions.insert_one(document)
+        return res.inserted_id
 
     def del_from_wip_collection(self, user_id) -> None:
         self.wip_questions.delete_one( { "_id": user_id } )
