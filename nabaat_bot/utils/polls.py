@@ -34,7 +34,7 @@ async def create_poll(context: ContextTypes.DEFAULT_TYPE) -> None:
         }
     }
     bot_data.update(payload)
-    logger.info(f"bot_data: {bot_data}")
+    # logger.info(f"bot_data: {bot_data}")
     # poll_str = poll.to_dict() 
     # message = (
     #     f"Poll message attributes:\n\n"
