@@ -121,20 +121,20 @@ async def close_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question_num = topic_name.split(" | #")[1]
     if str(expert_id) not in experts:
         await context.bot.send_message(chat_id=group_id, text="تنها کارشناسان قادر به استفاده از این دستور هستند.", message_thread_id=topic_id)
-        return ConversationHandler.END
+        return 
     if not db.check_if_user_exists(customer_id):
         reply_text = """
 این ID در دیتابیس موجود نیست.
 """
         await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
-        return ConversationHandler.END
+        return
     question_doc = db.wip_questions.find_one({"_id": customer_id})
     if not question_doc:
         reply_text = """
 این کاربر سوال فعالی ندارد.
 """
         await context.bot.send_message(chat_id=group_id, text=reply_text, message_thread_id=topic_id)
-        return ConversationHandler.END
+        return
     user_data["customer_id"] = customer_id
     user_data["question_num"] = question_num
     # reply_text = "توصیه نهایی به کاربر؟\n\nلغو با /cancel"
@@ -155,6 +155,16 @@ async def close_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
         context.job_queue.run_once(create_poll, when=2, chat_id=customer_id, data=poll_data)
+        fin_doc = db.fin_questions.find_one({"_id": fin_id})
+        file_ids = fin_doc["question1"].get("file-id")
+        message_ids = fin_doc["question1"].get("picture-id")
+        if file_ids:
+            for i, file_id in enumerate(file_ids):
+                photo = await context.bot.get_file(file_id)
+                await photo.download_to_drive(f"{message_ids[i]}.jpg")
+            db.save_pictures(fin_id, message_ids)
+            
+            
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):

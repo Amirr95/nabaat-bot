@@ -154,9 +154,11 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if message_photo:
         message_id = update.message.id
+        file_id = message_photo[3].file_id
         db.log_activity(user.id, "sent a picture", str(message_id))
         user_data['message_ids'].append(message_id)
         db.wip_questions.update_one({"_id": user.id}, {"$push": {f"{user_data['question-name']}.picture-id": message_id}})
+        db.wip_questions.update_one({"_id": user.id}, {"$push": {f"{user_data['question-name']}.file-id": file_id}})
         reply_text = "در صورتی که تصویر دیگری ندارید <b>/fin</b> را بزنید. در غیر این صورت تصویر خود را ارسال کنید."
         await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
         return HANDLE_PICTURES

@@ -1,4 +1,5 @@
 import pymongo
+import gridfs
 from datetime import datetime
 from bson.objectid import ObjectId
 import os
@@ -12,6 +13,7 @@ class Database:
     def __init__(self) -> None:
         self.client = pymongo.MongoClient(os.environ["MONGODB_URI"])
         self.db = self.client["nabaatBot"]  # database name
+        self.pictures_db_gridFS = gridfs.GridFS(self.client["pictures"])
         self.user_collection = self.db["userCollection"]
         self.bot_collection = self.db["botCollection"]
         self.activity_collection = self.db["activityCollection"]
@@ -21,6 +23,20 @@ class Database:
         self.fin_questions = self.db["finQuestionsCollection"]
         self.required_fields = ["_id", "username", "name", "phone-number"]
 
+    def save_pictures(self, question_id: ObjectId, pic_names: list[int]) -> None:
+        """
+        input: 
+            - ObjectID of a document in finQuestionCollection.
+            - list of picture names (message IDs)
+            
+        Will look for picture ids and save the pictures in mongodb.
+        Saves the resulting ObjectIDs of the pictures in the question document.
+        """
+        for name in pic_names:
+            with open(f"{name}.jpg", "rb") as photo:
+                self.pictures_db_gridFS.put(photo, questionID=question_id)
+            os.system(f"rm {name}.jpg")
+    
     def check_if_user_exists(self, user_id: int, raise_exception: bool = False) -> bool:
         if self.user_collection.count_documents({"_id": user_id}) > 0:
             return True
