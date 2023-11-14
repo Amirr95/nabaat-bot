@@ -8,12 +8,14 @@ from telegram.ext import (
     PollAnswerHandler
 )
 from telegram.constants import ParseMode
-from telegram.error import NetworkError
+from telegram.error import NetworkError, BadRequest, Forbidden
 import os
 import warnings
 import html
 import json
 import traceback
+
+import database
 
 from utils.commands import start, about_us, customer_reply_conv_handler
 from utils.register_conv import register_conv_handler
@@ -21,15 +23,31 @@ from utils.ask_question import ask_conv_handler
 from utils.comms import expert_reply_conv_handler, close_topic
 from utils.logger import logger
 from utils.polls import assess_poll
+from utils.label import label_conv_handler
 
 warnings.filterwarnings(action="ignore", category=UserWarning)
 
 # Constants for ConversationHandler states
 # db = database.Database()
 TOKEN = os.environ["AGRIWEATHBOT_TOKEN"]
-# ADMIN_LIST = db.get_admins()
+
+db = database.Database()
+
+ADMIN_LIST = db.get_admins()
 # GROUP_IDS = [-1001893146969]
 
+async def send_up_notice(context: ContextTypes.DEFAULT_TYPE):
+    message = """
+تغییرات بات:
+✅ موارد 9-10 بک‌لاگ
+✅ دخیره تصاویر ارسال شده در دیتابیس
+"""
+    for admin in ADMIN_LIST:
+        try:
+            await context.bot.send_message(chat_id=admin, text="بات دوباره راه‌اندازی شد"+"\n"+ message)
+            logger.info("Sent up notice to admins...")
+        except BadRequest or Forbidden:
+            logger.warning(f"admin {admin} has deleted the bot")
 # Fallback handlers
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log the error and send a telegram message to notify the developer."""
@@ -65,7 +83,7 @@ def main():
     # Add handlers to the application
     application.add_error_handler(error_handler)
     application.add_handler(CommandHandler('start', start, filters=filters.ChatType.PRIVATE))
-    application.add_handler(MessageHandler(filters.Regex("^📬 درباره نبات$"), about_us))
+    application.add_handler(MessageHandler(filters.Regex("^📬 درباره نبات$") & filters.ChatType.PRIVATE, about_us))
 
     # application.add_handler(CommandHandler("poll", poll))
     application.add_handler(PollAnswerHandler(assess_poll))
@@ -73,10 +91,15 @@ def main():
     application.add_handler(ask_conv_handler)
     application.add_handler(register_conv_handler)
     application.add_handler(expert_reply_conv_handler)
-    application.add_handler(CommandHandler('close', close_topic))
+    application.add_handler(label_conv_handler)
+    application.add_handler(CommandHandler('close', close_topic, filters=filters.ChatType.SUPERGROUP))
     application.add_handler(customer_reply_conv_handler)
     # application.add_handler(MessageHandler(filters.ALL, group_handler))
-
+    
+    # Schedule periodic messages
+    job_queue = application.job_queue
+    job_queue.run_once(send_up_notice, when=5)
+    
     
     # Start the bot
     application.run_polling()
