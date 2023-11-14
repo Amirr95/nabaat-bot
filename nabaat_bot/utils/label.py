@@ -102,9 +102,9 @@ async def handle_labels(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if customer_product:
             user_data.update({"customer-product": customer_product})
             db.wip_questions.update_one( {"_id": user_data["customer_id"]},
-                                         {"$set": {"expert-label.main-issue": user_data["main-issue"]}})
+                                         {"$set": {"question1.expert-label.main-issue": user_data["main-issue"]}})
             db.wip_questions.update_one( {"_id": user_data["customer_id"]},
-                                         {"$set": {"expert-label.product": user_data["customer-product"]}})
+                                         {"$set": {"question1.expert-label.product": user_data["customer-product"]}})
             reply_text = """
 لیبل‌ها با موفقیت اعمال شدند
 """
