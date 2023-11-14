@@ -19,7 +19,7 @@ RECEIVE_MESSAGE = range(1)
 
 async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
     customer_id = context.job.chat_id
-    customer_address = db.user_collection.find_one( {"_id": customer_id} )["address"]
+    customer_address = db.user_collection.find_one( {"_id": customer_id} ).get("address", "ثبت نشده")
     customer_username = context.job.data["username"]
     question_name = context.job.data["question-name"]
     experts = db.get_experts()
