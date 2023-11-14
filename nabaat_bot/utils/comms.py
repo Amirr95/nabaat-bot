@@ -40,6 +40,11 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
 تماس با کاربر با دستورات زیر:
 <b>پیام دادن به کاربر با ارسال دستور /msg</b>
 <b>پایان رسیدگی به سوال و بستن تاپیک با ارسال دستوز /close</b>
+ـــــــــــــــــــــــــــ
+ـــــــــــــــــــــــــــ
+<b>پیش از بستن تاپیک با استفاده از دستور /label برای این سوال برچسب تهیه کنید</b>
+ـــــــــــــــــــــــــــ
+ـــــــــــــــــــــــــــ
 """
     await context.bot.send_message(chat_id=group_id, text=cmd_guide, message_thread_id=res.message_thread_id, parse_mode=ParseMode.HTML)
     await context.bot.send_message(chat_id=group_id, text=text, message_thread_id=res.message_thread_id)
