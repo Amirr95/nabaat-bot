@@ -15,14 +15,15 @@ from telegram.ext import (
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden
 import warnings
+from .resumes import gerdening1, nutrition1, nutrition2, green_house1
 
 import database
-from .keyboards import register_keyboard, start_keyboard, disclaimer_keyboard, back_button
+from .keyboards import *
 from .comms import send_question_to_expert
 from .logger import logger
 
-
-MENU_CMDS = ['✍️ ثبت نام', '📤 دعوت از دیگران', '🖼 مشاهده باغ ها', '➕ اضافه کردن باغ', '🗑 حذف باغ ها', '✏️ ویرایش باغ ها', '🌦 درخواست اطلاعات هواشناسی', '/start', '/stats', '/send', '/set']
+MENU_CMDS = ['✍️ ثبت نام', '📤 دعوت از دیگران', '🖼 مشاهده باغ ها', '➕ اضافه کردن باغ', '🗑 حذف باغ ها',
+             '✏️ ویرایش باغ ها', '🌦 درخواست اطلاعات هواشناسی', '/start', '/stats', '/send', '/set']
 
 db = database.Database()
 # Constants for ConversationHandler states
@@ -38,8 +39,18 @@ PREDEFINED_QUESTIONS = [
     GET_PICTURES,
     HANDLE_PICTURES,
     ADDITIONAL_INFO,
-    HANDLE_INFO   
-) = range(6)
+    HANDLE_INFO,
+    SELECT_EXPERT,
+    HANDLE_SPECIALTIES,
+    NEXT_NUTRITION_SPECIALIST,
+    BEFORE_NUTRITION,
+    NEXT_AGRICULTURE_SPECIALIST,
+    BEFORE_AGRICULTURE,
+    NEXT_GARDEN,
+    BEFORE_GARDEN,
+    NEXT_SCIENCE
+) = range(15)
+
 
 async def show_disclaimer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -48,7 +59,7 @@ async def show_disclaimer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_wip_doc = db.wip_questions.find_one({"_id": user.id})
     if not user_wip_doc:
         user_data["question-name"] = "question1"
-    elif user_wip_doc.get("question1"): # and user_wip_doc.get("question2"):
+    elif user_wip_doc.get("question1"):  # and user_wip_doc.get("question2"):
         reply_text = """
 شما یک سوال ثبت کرده‌اید. لطفا پیش از ثبت سوال جدید، منتظر پاسخ کارشناس به سوال قبلی بمانید.
 """
@@ -67,9 +78,10 @@ async def show_disclaimer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
     reply_text = PREDEFINED_QUESTIONS[0]
-    await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML,reply_markup=disclaimer_keyboard())
+    await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML, reply_markup=disclaimer_keyboard())
     #
     return MAIN_QUESTION
+
 
 async def main_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -94,8 +106,9 @@ async def main_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return GET_PICTURES
     else:
         reply_text = PREDEFINED_QUESTIONS[0]
-        await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML,reply_markup=disclaimer_keyboard())
-        return MAIN_QUESTION 
+        await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML, reply_markup=disclaimer_keyboard())
+        return MAIN_QUESTION
+
 
 async def get_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -125,13 +138,14 @@ async def get_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.log_activity(user.id, "received main question", user_question)
         db.add_new_question(user.id, user_data["question-name"], PREDEFINED_QUESTIONS[1], user_question)
         timestamp = datetime.datetime.now().strftime("%Y%m%d %H:%M")
-        db.wip_questions.update_one({"_id": user.id}, 
+        db.wip_questions.update_one({"_id": user.id},
                                     {"$set": {f"{user_data['question-name']}.timestamp": timestamp}})
         # index = db.current_question_index(user.id)
         # db.set_user_attribute(user.id, f"questions[{index}].{PREDEFINED_QUESTIONS[2]}", answer3)
         reply_text = PREDEFINED_QUESTIONS[2]
         await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
         return HANDLE_PICTURES
+
 
 async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -151,12 +165,13 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_text = PREDEFINED_QUESTIONS[3]
         await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
         return ADDITIONAL_INFO
-    
+
     if message_photo:
         message_id = update.message.id
         db.log_activity(user.id, "sent a picture", str(message_id))
         user_data['message_ids'].append(message_id)
-        db.wip_questions.update_one({"_id": user.id}, {"$push": {f"{user_data['question-name']}.picture-id": message_id}})
+        db.wip_questions.update_one({"_id": user.id},
+                                    {"$push": {f"{user_data['question-name']}.picture-id": message_id}})
         reply_text = "در صورتی که تصویر دیگری ندارید <b>/fin</b> را بزنید. در غیر این صورت تصویر خود را ارسال کنید."
         await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
         return HANDLE_PICTURES
@@ -166,10 +181,11 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
         return HANDLE_PICTURES
 
+
 async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_data = context.user_data
-    job_data = {"username":user.username, "question-name":user_data["question-name"]}
+    job_data = {"username": user.username, "question-name": user_data["question-name"]}
     message_text = update.message.text
 
     if message_text == "بازگشت":
@@ -182,25 +198,25 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.log_activity(user.id, "error - answer in menu_cmd list", update.message.text)
         await update.message.reply_text("عمیلات قبلی لغو شد. لطفا دوباره تلاش کنید.", reply_markup=start_keyboard())
         return ConversationHandler.END
-    
+
     if message_text == "/fin":
         db.log_activity(user.id, "finished asking question")
-        reply_text = "سوال شما با موفقیت ثبت شد. کارشناسان نبات در اسرع وقت مورد شما را رسیدگی میکنند و خدمت شما پیام ارسال میکنند."
-        await update.message.reply_text(reply_text, reply_markup=start_keyboard())
-        context.job_queue.run_once(send_question_to_expert, when=10, chat_id=user.id, 
+        reply_text = "سوال شما با موفقیت ثبت شد.لطفا کارشناس مورد نظر خود را برای پاسخ به سوالتان انتخاب کنید"
+        await update.message.reply_text(reply_text, reply_markup=select_expert_keyboard())
+        context.job_queue.run_once(send_question_to_expert, when=10, chat_id=user.id,
                                    data=job_data)
-        return ConversationHandler.END
+        return SELECT_EXPERT
 
     if message_text and message_text != "/fin":
         db.log_activity(user.id, "entered additional info")
         added_info = message_text
         key = "اطلاعات تکمیلی"
         db.wip_questions.update_one({"_id": user.id}, {"$set": {f"{user_data['question-name']}.{key}": added_info}})
-        reply_text = "سوال شما با موفقیت ثبت شد. کارشناسان نبات در اسرع وقت مورد شما را رسیدگی میکنند و خدمت شما پیام ارسال میکنند."
-        await update.message.reply_text(reply_text, reply_markup=start_keyboard())
-        context.job_queue.run_once(send_question_to_expert, when=1, chat_id=user.id, 
+        reply_text = "سوال شما با موفقیت ثبت شد.لطفا کارشناس مورد نظر خود را برای پاسخ به سوالتان انتخاب کنید"
+        await update.message.reply_text(reply_text, reply_markup=select_expert_keyboard())
+        context.job_queue.run_once(send_question_to_expert, when=1, chat_id=user.id,
                                    data=job_data)
-        return ConversationHandler.END
+        return SELECT_EXPERT
 
     if not message_text:
         db.log_activity(user.id, "error - additional info had no text")
@@ -208,19 +224,211 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
         return ADDITIONAL_INFO
 
+
+async def select_expert(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+
+    if message_text == "مشاهده و انتخاب کارشناس":
+        reply_text = "کدام یک از تخصص های زیر مد نظر شماست؟"
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
+        return HANDLE_SPECIALTIES
+
+    if message_text == "انتخاب کارشناس توسط نبات":
+        reply_text = "سوال شما به کارشناس ارسال گردید و در اسرع وقت مورد شما را بررسی میکنند و خدمتتون پیام میدهند"
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        return ConversationHandler.END
+
+    if message_text == "بازگشت":
+        reply_text = PREDEFINED_QUESTIONS[3]
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
+        return ADDITIONAL_INFO
+
+
+async def handle_specialties(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+
+    if message_text == "علوم باغبانی":
+        reply_text = gerdening1()
+        await update.message.reply_text(reply_text, reply_markup=middle_button(), parse_mode=ParseMode.HTML)
+        return NEXT_SCIENCE
+
+    if message_text == "تغذیه گیاهی":
+        reply_text = nutrition1()
+        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
+        return NEXT_NUTRITION_SPECIALIST
+
+    if message_text == "گل خانه":
+        reply_text = nutrition1()
+        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
+        return NEXT_AGRICULTURE_SPECIALIST
+
+    if message_text == "باغ(درختان میوه)":
+        reply_text = nutrition1()
+        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
+        return NEXT_GARDEN
+
+    if message_text == "زراعت و صیفی جات":
+        reply_text = nutrition1()
+        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
+        return NEXT_AGRICULTURE_SPECIALIST
+
+    if message_text == "بازگشت":
+        reply_text = "سوال شما با موفقیت ثبت شد.لطفا کارشناس مورد نظر خود را برای پاسخ به سوالتان انتخاب کنید"
+        await update.message.reply_text(reply_text, reply_markup=select_expert_keyboard(), parse_mode=ParseMode.HTML)
+        return SELECT_EXPERT
+
+
+async def next_science(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+
+    if message_text == "انتخاب کارشناس":
+        reply_text = "کارشناس انتخابی شما با موفقیت ثبت شد و سوال شما برای ایشان ارسال خواهد شد"
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        return ConversationHandler.END
+
+    if message_text == "بازگشت":
+        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
+        return HANDLE_SPECIALTIES
+
+
+async def next_garden(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+
+    if message_text == "بعدی":
+        reply_text = nutrition2()
+        await update.message.reply_text(reply_text, reply_markup=before_button(), parse_mode=ParseMode.HTML)
+        return BEFORE_GARDEN
+
+    if message_text == "انتخاب کارشناس":
+        reply_text = "کارشناس انتخابی شما با موفقیت ثبت شد و سوال شما برای ایشان ارسال خواهد شد"
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        return ConversationHandler.END
+
+    if message_text == "بازگشت":
+        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
+        return HANDLE_SPECIALTIES
+
+
+async def before_garden(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+    reply_text = nutrition1()
+
+    if message_text == "انتخاب کارشناس":
+        reply_text = "کارشناس انتخابی شما با موفقیت ثبت شد و سوال شما برای ایشان ارسال خواهد شد"
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        return ConversationHandler.END
+
+    if message_text == "قبلی":
+        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
+        return NEXT_GARDEN
+
+    if message_text == "بازگشت":
+        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
+        return HANDLE_SPECIALTIES
+
+
+async def next_agriculture(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+
+    if message_text == "بعدی":
+        reply_text = green_house1()
+        await update.message.reply_text(reply_text, reply_markup=before_button(), parse_mode=ParseMode.HTML)
+        return BEFORE_NUTRITION
+
+    if message_text == "انتخاب کارشناس":
+        reply_text = "کارشناس انتخابی شما با موفقیت ثبت شد و سوال شما برای ایشان ارسال خواهد شد"
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        return ConversationHandler.END
+
+    if message_text == "بازگشت":
+        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
+        return HANDLE_SPECIALTIES
+
+
+async def before_agriculture(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+    reply_text = nutrition1()
+
+    if message_text == "انتخاب کارشناس":
+        reply_text = "کارشناس انتخابی شما با موفقیت ثبت شد و سوال شما برای ایشان ارسال خواهد شد"
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        return ConversationHandler.END
+
+    if message_text == "قبلی":
+        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
+        return NEXT_AGRICULTURE_SPECIALIST
+
+    if message_text == "بازگشت":
+        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
+        return HANDLE_SPECIALTIES
+
+
+async def next_nutrition_specialist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+
+    if message_text == "بعدی":
+        reply_text = nutrition2()
+        await update.message.reply_text(reply_text, reply_markup=before_button(), parse_mode=ParseMode.HTML)
+        return BEFORE_AGRICULTURE
+
+    if message_text == "انتخاب کارشناس":
+        reply_text = "کارشناس انتخابی شما با موفقیت ثبت شد و سوال شما برای ایشان ارسال خواهد شد"
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        return ConversationHandler.END
+
+    if message_text == "بازگشت":
+        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
+        return HANDLE_SPECIALTIES
+
+
+async def before_nutrition(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+    reply_text = nutrition1()
+
+    if message_text == "انتخاب کارشناس":
+        reply_text = "کارشناس انتخابی شما با موفقیت ثبت شد و سوال شما برای ایشان ارسال خواهد شد"
+        await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        return ConversationHandler.END
+
+    if message_text == "قبلی":
+        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
+        return NEXT_NUTRITION_SPECIALIST
+
+    if message_text == "بازگشت":
+        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
+        return HANDLE_SPECIALTIES
+
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("عملیات کنسل شد!")
     return ConversationHandler.END
 
 
 ask_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex('👨‍🌾 ارسال سوال'), show_disclaimer)],
-        states={
-            MAIN_QUESTION: [MessageHandler(~filters.COMMAND, main_question)],
-            # Q3: [MessageHandler(~filters.COMMAND, q3)],
-            GET_PICTURES: [MessageHandler(filters.COMMAND | filters.TEXT, get_pictures)],
-            HANDLE_PICTURES: [MessageHandler(filters.ALL, handle_pictures)],
-            ADDITIONAL_INFO: [MessageHandler(filters.ALL, additional_info)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
+    entry_points=[MessageHandler(filters.Regex('👨‍🌾 ارسال سوال'), show_disclaimer)],
+
+    states={
+        MAIN_QUESTION: [MessageHandler(~filters.COMMAND, main_question)],
+        # Q3: [MessageHandler(~filters.COMMAND, q3)],
+        GET_PICTURES: [MessageHandler(filters.COMMAND | filters.TEXT, get_pictures)],
+        HANDLE_PICTURES: [MessageHandler(filters.ALL, handle_pictures)],
+        ADDITIONAL_INFO: [MessageHandler(filters.ALL, additional_info)],
+        SELECT_EXPERT: [MessageHandler(filters.ALL, select_expert)],
+        HANDLE_SPECIALTIES: [MessageHandler(filters.ALL, handle_specialties)],
+        NEXT_NUTRITION_SPECIALIST: [MessageHandler(filters.ALL, next_nutrition_specialist)],
+        BEFORE_NUTRITION: [MessageHandler(filters.ALL, before_nutrition)],
+        NEXT_AGRICULTURE_SPECIALIST: [MessageHandler(filters.ALL, next_agriculture)],
+        BEFORE_AGRICULTURE: [MessageHandler(filters.ALL, before_agriculture)],
+        NEXT_GARDEN: [MessageHandler(filters.ALL, next_garden)],
+        BEFORE_GARDEN: [MessageHandler(filters.ALL, before_garden)],
+        NEXT_SCIENCE: [MessageHandler(filters.ALL, next_science)]
+    },
+    fallbacks=[CommandHandler("cancel", cancel)],
+)
