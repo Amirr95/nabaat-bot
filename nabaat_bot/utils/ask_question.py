@@ -1,4 +1,6 @@
 import datetime
+import random
+
 from telegram import (
     KeyboardButton,
     Update,
@@ -93,9 +95,9 @@ async def main_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
     elif update.message.text == "آیین‌نامه را خواندم و قبول می‌کنم":
         db.log_activity(user.id, "accepted disclaimer")
-        reply_text = PREDEFINED_QUESTIONS[1]
-        await update.message.reply_text(reply_text, reply_markup=back_button())
-        return GET_PICTURES
+        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard())
+        return HANDLE_SPECIALTIES
     else:
         reply_text = PREDEFINED_QUESTIONS[0]
         await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML,reply_markup=disclaimer_keyboard())
@@ -106,9 +108,9 @@ async def get_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = context.user_data
     if update.message.text == "بازگشت":
         db.log_activity(user.id, "back")
-        reply_text = PREDEFINED_QUESTIONS[0]
-        await update.message.reply_text(reply_text, reply_markup=disclaimer_keyboard())
-        return MAIN_QUESTION
+        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
+        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard())
+        return HANDLE_SPECIALTIES
     elif update.message.text in MENU_CMDS:
         db.log_activity(user.id, "error - answer in menu_cmd list", update.message.text)
         await update.message.reply_text("عمیلات قبلی لغو شد. لطفا دوباره تلاش کنید.", reply_markup=start_keyboard())
@@ -175,7 +177,6 @@ async def handle_pictures(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_data = context.user_data
-    job_data = {"username":user.username, "question-name":user_data["question-name"]}
     message_text = update.message.text
 
     if message_text == "بازگشت":
@@ -193,8 +194,6 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.log_activity(user.id, "finished asking question")
         reply_text = "سوال شما با موفقیت ثبت شد.لطفا کارشناس مورد نظر خود را برای پاسخ به سوالتان انتخاب کنید"
         await update.message.reply_text(reply_text, reply_markup=select_expert_keyboard())
-        context.job_queue.run_once(send_question_to_expert, when=10, chat_id=user.id,
-                                   data=job_data)
         return SELECT_EXPERT
 
     if message_text and message_text != "/fin":
@@ -204,7 +203,6 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.wip_questions.update_one({"_id": user.id}, {"$set": {f"{user_data['question-name']}.{key}": added_info}})
         reply_text = "سوال شما با موفقیت ثبت شد.لطفا کارشناس مورد نظر خود را برای پاسخ به سوالتان انتخاب کنید"
         await update.message.reply_text(reply_text, reply_markup=select_expert_keyboard())
-        context.job_queue.run_once(send_question_to_expert, when=1, chat_id=user.id, data=job_data)
         return SELECT_EXPERT
 
     if not message_text:
@@ -216,15 +214,53 @@ async def additional_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def select_expert(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
+    specialty = context.user_data['specialty']
 
     if message_text == "مشاهده و انتخاب کارشناس":
-        reply_text = "کدام یک از تخصص های زیر مد نظر شماست؟"
-        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
-        return HANDLE_SPECIALTIES
+        if specialty == 'nutrition':
+            reply_text = nutrition[0]
+
+        if specialty == 'gardening':
+            reply_text = gardening[0]
+
+        if specialty == 'green_house':
+            reply_text = green_house[0]
+
+        if specialty == 'garden':
+            reply_text = garden[0]
+
+        if specialty == 'agriculture':
+            reply_text = agriculture[0]
+
+        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
+        return NEXT
 
     if message_text == "انتخاب کارشناس توسط نبات":
+        user = update.effective_user
+        user_data = context.user_data
+        specialty = context.user_data['specialty']
+
+        if specialty == 'nutrition':
+            expert = random.choice(nutrition).split('\n')[0]
+
+        if specialty == 'gardening':
+            expert = random.choice(gardening).split('\n')[0]
+
+        if specialty == 'green_house':
+            expert = random.choice(green_house).split('\n')[0]
+
+        if specialty == 'garden':
+            expert = random.choice(garden).split('\n')[0]
+
+        if specialty == 'agriculture':
+            expert = random.choice(agriculture).split('\n')[0]
+
+        job_data = {"username": user.username, "question-name": user_data["question-name"], "expert": expert}
+        context.user_data["expert"] = expert
+
         reply_text = "سوال شما به کارشناس ارسال گردید و در اسرع وقت مورد شما را بررسی میکنند و خدمتتون پیام میدهند"
         await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        context.job_queue.run_once(send_question_to_expert, when=1, chat_id=user.id, data=job_data)
         return ConversationHandler.END
 
     if message_text == "بازگشت":
@@ -272,6 +308,7 @@ async def next(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if specialty == 'agriculture':
                 reply_text = agriculture[context.user_data['status']]
 
+            context.user_data['expert'] = reply_text.split('\n')[0]
             await update.message.reply_text(reply_text, reply_markup=middle_button(), parse_mode=ParseMode.HTML)
             return NEXT
 
@@ -299,54 +336,60 @@ async def next(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return NEXT
 
     if message_text == "انتخاب کارشناس":
+        user = update.effective_user
+        user_data = context.user_data
+        job_data = {"username": user.username, "question-name": user_data["question-name"], "expert": user_data["expert"]}
+
         reply_text = "کارشناس انتخابی شما با موفقیت ثبت شد و سوال شما برای ایشان ارسال خواهد شد"
         await update.message.reply_text(reply_text, reply_markup=start_keyboard(), parse_mode=ParseMode.HTML)
+        context.job_queue.run_once(send_question_to_expert, when=1, chat_id=user.id, data=job_data)
         return ConversationHandler.END
 
     if message_text == "بازگشت":
-        reply_text = 'کدام یک از تخصص های زیر مد نظر شماست؟'
-        await update.message.reply_text(reply_text, reply_markup=specialties_keyboard(), parse_mode=ParseMode.HTML)
+        reply_text = 'سوال شما با موفقیت ثبت شد.لطفا کارشناس مورد نظر خود را برای پاسخ به سوالتان انتخاب کنید'
+        await update.message.reply_text(reply_text, reply_markup=select_expert_keyboard(), parse_mode=ParseMode.HTML)
         return HANDLE_SPECIALTIES
 
 
 async def handle_specialties(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
     context.user_data['status'] = 0
+    reply_text = PREDEFINED_QUESTIONS[1]
 
     if message_text == "علوم باغبانی":
-        reply_text = gardening[0]
         context.user_data['specialty'] = 'gardening'
-        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
-        return NEXT
+        context.user_data['expert'] = gardening[0].split('\n')[0]
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
+        return GET_PICTURES
 
     if message_text == "تغذیه گیاهی":
-        reply_text = nutrition[0]
         context.user_data['specialty'] = 'nutrition'
-        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
-        return NEXT
+        context.user_data['expert'] = nutrition[0].split('\n')[0]
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
+        return GET_PICTURES
 
     if message_text == "گل خانه":
-        reply_text = green_house[0]
         context.user_data['specialty'] = 'green_house'
-        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
-        return NEXT
+        context.user_data['expert'] = green_house[0].split('\n')[0]
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
+        return GET_PICTURES
 
     if message_text == "باغ(درختان میوه)":
-        reply_text = garden[0]
         context.user_data['specialty'] = 'garden'
-        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
-        return NEXT
+        context.user_data['expert'] = garden[0].split('\n')[0]
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
+        return GET_PICTURES
 
     if message_text == "زراعت و صیفی جات":
-        reply_text = agriculture[0]
         context.user_data['specialty'] = 'agriculture'
-        await update.message.reply_text(reply_text, reply_markup=next_button(), parse_mode=ParseMode.HTML)
-        return NEXT
+        context.user_data['expert'] = agriculture[0].split('\n')[0]
+        await update.message.reply_text(reply_text, reply_markup=back_button(), parse_mode=ParseMode.HTML)
+        return GET_PICTURES
 
     if message_text == "بازگشت":
-        reply_text = "سوال شما با موفقیت ثبت شد.لطفا کارشناس مورد نظر خود را برای پاسخ به سوالتان انتخاب کنید"
-        await update.message.reply_text(reply_text, reply_markup=select_expert_keyboard(), parse_mode=ParseMode.HTML)
-        return SELECT_EXPERT
+        reply_text = PREDEFINED_QUESTIONS[0]
+        await update.message.reply_text(reply_text, reply_markup=disclaimer_keyboard(), parse_mode=ParseMode.HTML)
+        return MAIN_QUESTION
 
 
 

@@ -22,7 +22,9 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
     customer_address = db.user_collection.find_one( {"_id": customer_id} ).get("address", "ثبت نشده")
     customer_username = context.job.data["username"]
     question_name = context.job.data["question-name"]
+    expert = context.job.data["expert"]
     experts = db.get_experts()
+
     chosen_expert = random.choice(list(experts.keys()))
     db.wip_questions.update_one({"_id": customer_id}, {"$set": {f"{question_name}.expert-id": int(chosen_expert)}})
     group_id = experts[chosen_expert]
@@ -33,6 +35,7 @@ async def send_question_to_expert(context: ContextTypes.DEFAULT_TYPE):
     question_list = db.bot_collection.find_one( {"name": "questions-list"} )["questions"]
     text = f"username: @{customer_username}\n"
     text = text + "\n" + f"آدرس: {customer_address}"
+    text = text + "\n" + f"کارشناس: {expert}"
     for q in question_list:
         answer = question[question_name].get(q)
         text = text + "\n" + f"{q}: {answer}"

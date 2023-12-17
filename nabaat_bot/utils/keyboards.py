@@ -40,9 +40,11 @@ def specialties_keyboard():
     keyboard = [['زراعت و صیفی جات'], ['باغ(درختان میوه)'], ['تغذیه گیاهی'], ['گل خانه'], ['علوم باغبانی'], ['بازگشت']]
     return ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
+
 def next_button():
     keyboard = [['بعدی'], ['انتخاب کارشناس'], ['بازگشت']]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
 
 def middle_button():
     keyboard = [['بعدی'], ['انتخاب کارشناس'], ['قبلی'], ['بازگشت']]
